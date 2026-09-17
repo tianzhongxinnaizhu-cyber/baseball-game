@@ -1,4 +1,4 @@
-const CACHE = "baseball-gm-v3.31-pages-1";
+const CACHE = "baseball-gm-v3.31-pages-2";
 const ASSETS = [
   "./",
   "./index.html",
