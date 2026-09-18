@@ -1,9 +1,15 @@
-# Baseball GM v3.32
+# Baseball GM v3.33
 
 月単位で進める編成型・野球GMシミュレーションです。
 
 GitHub Pages:
 https://tianzhongxinnaizhu-cyber.github.io/baseball-game/
+
+## v3.33
+- シーズン主要記録に規定打席を導入
+- 規定打席は 143試合 × 3.1 = 443打席
+- 首位打者・最高OPSは規定打席到達者のみ対象
+- 代打優先順位の能力表示を固定列化し、ミート・パワー・走力・弾道の位置を縦に整列
 
 ## v3.32
 - オフ特訓の選手選択で能力値を確認可能
