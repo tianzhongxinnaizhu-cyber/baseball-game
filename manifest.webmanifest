@@ -1,13 +1,1 @@
-{
-  "name": "Baseball GM",
-  "short_name": "Baseball GM",
-  "description": "月単位で進める編成型・野球GMシミュレーション",
-  "start_url": "./index.html",
-  "scope": "./",
-  "display": "standalone",
-  "background_color": "#f3f5f8",
-  "theme_color": "#111827",
-  "icons": [
-    {"src":"icon.svg","sizes":"any","type":"image/svg+xml","purpose":"any maskable"}
-  ]
-}
+{"name":"Baseball GM","short_name":"Baseball GM","start_url":"./","scope":"./","display":"standalone","background_color":"#f3f5f8","theme_color":"#111827","description":"Browser-based Japanese baseball GM simulation","icons":[{"src":"./icon.svg","sizes":"any","type":"image/svg+xml","purpose":"any maskable"}]}
