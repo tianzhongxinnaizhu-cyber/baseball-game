@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>Baseball GM v3.33</title>
+  <title>Baseball GM v3.34</title>
   <style>
 :root {
   --bg: #f3f5f8;
@@ -353,7 +353,7 @@ table{font-size:12.2px!important}th{font-size:11.3px!important}th,td{padding:7px
 @media(max-width:760px){.year-end-screen{padding:8px}.year-end-head{align-items:flex-start;flex-direction:column}.year-end-body{padding:10px}.year-end-summary{width:100%}}
 
 
-/* -------------------- v3.33 save / load -------------------- */
+/* -------------------- v3.34 save / load -------------------- */
 .save-status{font-size:11px;color:var(--muted);padding:7px 10px;border:1px solid var(--line);border-radius:999px;background:rgba(255,255,255,.72);white-space:nowrap}
 .save-status.saved{color:#177245;border-color:rgba(23,114,69,.25);background:rgba(232,248,239,.92)}
 .save-status.error{color:#a52a2a;border-color:rgba(165,42,42,.25);background:rgba(255,239,239,.92)}
@@ -368,7 +368,7 @@ table{font-size:12.2px!important}th{font-size:11.3px!important}th,td{padding:7px
 @media(max-width:680px){.save-slot{grid-template-columns:1fr}.save-slot-actions{justify-content:flex-start}.startup-actions{grid-template-columns:1fr}.save-status{display:none}}
 
 
-/* -------------------- v3.33 qualification + pinch alignment -------------------- */
+/* -------------------- v3.34 qualification + pinch alignment -------------------- */
 .pinch-order-item{grid-template-columns:44px minmax(120px,1fr) 58px 284px!important}
 .pinch-stat{min-width:0;width:100%}
 .pinch-abilities{display:grid!important;grid-template-columns:repeat(4,64px);justify-content:end;align-items:center;gap:6px!important;width:100%;font-variant-numeric:tabular-nums}
@@ -376,6 +376,18 @@ table{font-size:12.2px!important}th{font-size:11.3px!important}th,td{padding:7px
 .pinch-abilities>span:last-child{grid-template-columns:16px 46px}
 .pinch-abilities .ability-badge{justify-self:start}
 @media(max-width:760px){.pinch-order-item{grid-template-columns:36px minmax(100px,1fr) 48px!important}.pinch-stat{grid-column:2/4;text-align:left}.pinch-abilities{grid-template-columns:repeat(2,68px);justify-content:start}}
+
+/* -------------------- v3.34 special training scroll selector -------------------- */
+.special-training-selector{margin-top:9px;border:1px solid #dfe5ec;border-radius:10px;overflow:auto;max-height:330px;background:#fff}
+.special-training-player-head,.special-training-player-row{display:grid;grid-template-columns:minmax(190px,1fr) repeat(9,48px);gap:4px;align-items:center;min-width:690px;font-variant-numeric:tabular-nums}
+.special-training-player-head{position:sticky;top:0;z-index:3;background:#f3f6f9;border-bottom:1px solid #dfe5ec;padding:7px 8px;font-size:9px;font-weight:1000;color:#637285;text-align:center}
+.special-training-player-head>span:first-child{text-align:left}
+.special-training-player-row{appearance:none;-webkit-appearance:none;width:100%;padding:7px 8px;border:0;border-bottom:1px solid #edf0f4;background:#fff;color:inherit;text-align:center;cursor:pointer;font:inherit}
+.special-training-player-row:last-child{border-bottom:0}.special-training-player-row:hover{background:#f7faff}.special-training-player-row.selected{background:#eaf3ff;box-shadow:inset 3px 0 0 #2a65a0}
+.special-training-player-main{text-align:left;min-width:0}.special-training-player-name{font-size:11px;font-weight:1000;color:#182638;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.special-training-player-meta{font-size:8.5px;color:#718094;font-weight:800;margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.special-training-ability-cell{display:flex;align-items:center;justify-content:center;min-width:0}.special-training-ability-cell .ability-badge .ability-letter,.special-training-ability-cell .ability-badge .ability-number{font-size:13px!important}.special-training-empty{color:#a3acb7;font-weight:900}
+.special-training-controls{grid-template-columns:minmax(150px,1fr) auto!important;margin-top:9px}
+@media(max-width:850px){.special-training-controls{grid-template-columns:1fr auto!important}.special-training-selector{max-height:300px}}
 </style>
   <link rel="manifest" href="./manifest.webmanifest" />
   <meta name="theme-color" content="#111827" />
@@ -383,7 +395,7 @@ table{font-size:12.2px!important}th{font-size:11.3px!important}th,td{padding:7px
 <body>
   <header class="app-header" id="appHeader">
     <div>
-      <div class="brand-mark"><span class="brand-dot"></span><div><h1>BASEBALL GM</h1><p>FRONT OFFICE SIMULATOR <b>v3.33</b></p></div></div>
+      <div class="brand-mark"><span class="brand-dot"></span><div><h1>BASEBALL GM</h1><p>FRONT OFFICE SIMULATOR <b>v3.34</b></p></div></div>
       <p>月単位で進める編成型・野球シミュレーション</p>
     </div>
     <div class="header-actions">
@@ -721,7 +733,7 @@ table{font-size:12.2px!important}th{font-size:11.3px!important}th,td{padding:7px
 
   <div id="startupModal" class="modal-backdrop hidden">
     <div class="startup-panel">
-      <div class="brand-mark"><span class="brand-dot"></span><div><h1>BASEBALL GM</h1><p>FRONT OFFICE SIMULATOR <b>v3.33</b></p></div></div>
+      <div class="brand-mark"><span class="brand-dot"></span><div><h1>BASEBALL GM</h1><p>FRONT OFFICE SIMULATOR <b>v3.34</b></p></div></div>
       <h2>ゲームを始める</h2>
       <p>この端末に自動セーブが残っていれば、その続きから再開できます。JSONのバックアップを読み込んで別PCから続けることもできます。</p>
       <div id="startupSaveMeta" class="startup-save-meta">自動セーブを確認しています…</div>
@@ -2437,28 +2449,34 @@ function specialTrainingOptions(p){
 }
 function offseasonTrainingPool(team){const arr=[...allPlayers(team),...(team.newcomers||[]).map(x=>x.player||x)];return [...new Map(arr.filter(Boolean).map(p=>[p.id,p])).values()];}
 function plainAbility(v){const n=Math.round(clamp(Number(v)||0,0,99));return `${grade(n)}${n}`;}
-function specialTrainingPlayerLabel(p){
-  if(p.type==="pitcher"){ensurePitcherBatting(p);return `${p.name}（投手 / ${p.age}歳） 球${plainAbility(p.stuff)} 制${plainAbility(p.control)} ス${plainAbility(p.stamina)} 変${plainAbility(p.breaking)}｜打 ミ${plainAbility(p.contact)} パ${plainAbility(p.power)} 走${plainAbility(p.speed)}`;}
-  return `${p.name}（${playerPositionsText(p)} / ${p.age}歳） ミ${plainAbility(p.contact)} パ${plainAbility(p.power)} 走${plainAbility(p.speed)} 守${plainAbility(p.defense)} 肩${plainAbility(p.arm)}`;
+function specialTrainingAbilityCell(v){return `<span class="special-training-ability-cell">${v==null?'<span class="special-training-empty">—</span>':abilityBadge(v)}</span>`;}
+function specialTrainingPlayerRow(p,selected=false){
+  if(p.type==="pitcher")ensurePitcherBatting(p);
+  const vals=p.type==="pitcher"?[p.stuff,p.control,p.stamina,p.breaking,p.contact,p.power,p.speed,null,null]:[null,null,null,null,p.contact,p.power,p.speed,p.defense,p.arm];
+  const meta=p.type==="pitcher"?`${pitcherRolesLabel(p)} / ${p.age}歳`:`${playerPositionsText(p)} / ${p.age}歳`;
+  return `<button type="button" class="special-training-player-row ${selected?'selected':''}" data-player-id="${p.id}" onclick="selectSpecialTrainingPlayer(${p.id})"><span class="special-training-player-main"><span class="special-training-player-name">${p.name}${p.twoWay?'<span class="two-way-badge">二刀流</span>':''}</span><span class="special-training-player-meta">${meta}</span></span>${vals.map(v=>specialTrainingAbilityCell(v)).join("")}</button>`;
 }
-function specialTrainingPreview(p){if(!p)return "";return `<div class="special-training-preview">${specialTrainingPlayerLabel(p)}</div>`;}
 function renderSpecialTraining(team){
   if(!isFinalOffseasonStage())return "";
   ensureTeamCoaches(team);
   offseasonState=offseasonState||{active:false,log:[],specialTrainingUsed:[],specialTrainingLog:[]};offseasonState.specialTrainingUsed=offseasonState.specialTrainingUsed||[];offseasonState.specialTrainingLog=offseasonState.specialTrainingLog||[];offseasonState.log=offseasonState.log||[];
   const used=offseasonState.specialTrainingUsed||[];
   const left=Math.max(0,OFFSEASON_SPECIAL_TRAINING_LIMIT-used.length);
-  const eligible=offseasonTrainingPool(team).filter(p=>!used.includes(p.id)).sort((a,b)=>a.age-b.age||playerOverall(b)-playerOverall(a));
-  const playerOpts=eligible.map(p=>`<option value="${p.id}">${specialTrainingPlayerLabel(p)}</option>`).join("");
+  const eligible=offseasonTrainingPool(team).filter(p=>!used.includes(p.id)).sort((a,b)=>a.type===b.type?(a.age-b.age||playerOverall(b)-playerOverall(a)):(a.type==="pitcher"?-1:1));
   const first=eligible[0];
+  const playerRows=eligible.map((p,i)=>specialTrainingPlayerRow(p,i===0)).join("");
   const focusOpts=(first?specialTrainingOptions(first):["balanced"]).map(k=>`<option value="${k}">${k==="batting"?"打撃総合":k==="bat_contact"?"打撃・ミート":k==="bat_power"?"打撃・パワー":k==="bat_speed"?"打撃・走力":TRAINING_LABELS[k]||k}</option>`).join("");
-  return `<div class="special-training-box"><div class="section-head"><div><span class="panel-kicker">SPECIAL TRAINING</span><h3 style="margin:2px 0 0">オフ特訓</h3></div><span class="special-training-slots">残り ${left} / ${OFFSEASON_SPECIAL_TRAINING_LIMIT}</span></div><div class="offseason-note">選手と重点項目を選び、担当育成コーチの指導力に応じて能力がランダム上昇します。1選手につき1回、1オフ最大${OFFSEASON_SPECIAL_TRAINING_LIMIT}人です。</div><div class="special-training-controls"><label>選手<select id="specialTrainingPlayer" onchange="refreshSpecialTrainingFocus()">${playerOpts||'<option>対象選手なし</option>'}</select></label><label>重点<select id="specialTrainingFocus">${focusOpts}</select></label><button class="primary" onclick="runSpecialTraining()" ${left<=0||!eligible.length?'disabled':''}>特訓する</button></div><div id="specialTrainingPreview">${specialTrainingPreview(first)}</div><div class="special-training-log">${(offseasonState.specialTrainingLog||[]).map(x=>`<div>${x}</div>`).join("")||"まだ特訓していません。"}</div></div>`;
+  return `<div class="special-training-box"><div class="section-head"><div><span class="panel-kicker">SPECIAL TRAINING</span><h3 style="margin:2px 0 0">オフ特訓</h3></div><span class="special-training-slots">残り ${left} / ${OFFSEASON_SPECIAL_TRAINING_LIMIT}</span></div><div class="offseason-note">選手をスクロール一覧から選び、重点項目を指定します。能力は通常画面と同じランク色で表示し、各項目を列で揃えています。1選手につき1回、1オフ最大${OFFSEASON_SPECIAL_TRAINING_LIMIT}人です。</div><div class="special-training-selector"><div class="special-training-player-head"><span>選手</span><span>球</span><span>制</span><span>ス</span><span>変</span><span>ミ</span><span>パ</span><span>走</span><span>守</span><span>肩</span></div>${playerRows||'<div class="summary-empty" style="padding:16px">対象選手はいません。</div>'}</div><input type="hidden" id="specialTrainingPlayer" value="${first?.id??''}"><div class="special-training-controls"><label>重点<select id="specialTrainingFocus">${focusOpts}</select></label><button class="primary" onclick="runSpecialTraining()" ${left<=0||!eligible.length?'disabled':''}>特訓する</button></div><div class="special-training-log">${(offseasonState.specialTrainingLog||[]).map(x=>`<div>${x}</div>`).join("")||"まだ特訓していません。"}</div></div>`;
+}
+function selectSpecialTrainingPlayer(playerId){
+  const sel=document.getElementById("specialTrainingPlayer");if(!sel)return;sel.value=String(playerId);
+  document.querySelectorAll(".special-training-player-row").forEach(row=>row.classList.toggle("selected",Number(row.dataset.playerId)===Number(playerId)));
+  refreshSpecialTrainingFocus();
 }
 function refreshSpecialTrainingFocus(){
   const team=teams[managedTeamId],sel=document.getElementById("specialTrainingPlayer"),focus=document.getElementById("specialTrainingFocus");if(!team||!sel||!focus)return;
   const p=offseasonTrainingPool(team).find(x=>x.id===Number(sel.value));if(!p)return;
   focus.innerHTML=specialTrainingOptions(p).map(k=>`<option value="${k}">${k==="batting"?"打撃総合":k==="bat_contact"?"打撃・ミート":k==="bat_power"?"打撃・パワー":k==="bat_speed"?"打撃・走力":TRAINING_LABELS[k]||k}</option>`).join("");
-  const preview=document.getElementById("specialTrainingPreview");if(preview)preview.innerHTML=specialTrainingPreview(p);
 }
 function runSpecialTraining(){
   if(!isFinalOffseasonStage())return;const team=teams[managedTeamId],pid=Number(document.getElementById("specialTrainingPlayer")?.value),focus=document.getElementById("specialTrainingFocus")?.value||"balanced";
@@ -2647,8 +2665,8 @@ function foreignKatakanaName(name){
 }
 function normalizeForeignPlayerName(p){if(!p?.isForeign)return;p.name=foreignKatakanaName(p.name);usedPlayerNames.add(p.name);}
 function nameForeignPlayer(){for(let i=0;i<300;i++){const n=`${choice(FOREIGN_FIRST)}・${choice(FOREIGN_LAST)}`;if(!usedPlayerNames.has(n)){usedPlayerNames.add(n);return n;}}const n=`${choice(FOREIGN_FIRST)}・${choice(FOREIGN_LAST)}${randInt(2,99)}`;usedPlayerNames.add(n);return n;}
-function makeForeignCandidate(i){
-  const isP=Math.random()<.52,quality=randInt(58,79),p=isP?makePitcher(Math.random()<.68?"SP":"MR",quality,{minor:true}):makeHitter(choice(["1B","2B","3B","SS","LF","CF","RF"]),quality,{minor:true});
+function makeForeignCandidate(i,forcedType=null){
+  const isP=forcedType==="pitcher"?true:forcedType==="hitter"?false:Math.random()<.52,quality=randInt(58,79),p=isP?makePitcher(Math.random()<.68?"SP":"MR",quality,{minor:true}):makeHitter(choice(["1B","2B","3B","SS","LF","CF","RF"]),quality,{minor:true});
   // 外国人市場は即戦力を中心に全体を底上げ。約10%はA級以上の看板能力を持つ。
   const boostAttrs=isP?PITCHER_ATTRS:HITTER_ATTRS;boostAttrs.forEach(a=>p[a]=clamp(p[a]+randInt(2,6),10,99));
   const impactStar=Math.random()<.10;
@@ -2660,7 +2678,7 @@ function makeForeignCandidate(i){
   if(isP){const era=rand(2.0,4.9),k=randInt(72,168),g=p.role==="SP"?randInt(18,28):randInt(35,58);stat=`${league} ${g}試合 防御率${era.toFixed(2)} ${k}奪三振`;comment=impactStar?choice(["圧倒的な直球が最大の武器。先発の柱候補。","空振りを量産するパワーアーム。日本でも上位級の球威が期待される。"]):choice(["直球に力があり、空振りを奪える右腕。","複数の変化球を操る先発候補。","制球には波があるが奪三振能力が魅力。","ゴロを打たせる投球が持ち味。"]);}else{const avg=rand(.235,.325),hr=randInt(9,38),ops=rand(.720,1.020);stat=`${league} ${avg.toFixed(3).replace(/^0/,"")} ${hr}本 OPS ${ops.toFixed(3).replace(/^0/,"")}`;comment=impactStar?choice(["規格外の長打力を持つ中軸候補。","打球速度が際立つ大砲。リーグを代表する長距離砲になり得る。"]):choice(["広角に長打を放つ中軸候補。","コンタクト能力に定評がある。","粗さはあるが一発の魅力が大きい。","走攻守のバランスに優れる外野手。"]);}
   return{id:`F${seasonYear}-${i}`,player:p,league,stat,comment,signedBy:null};
 }
-function generateForeignMarket(){return Array.from({length:randInt(5,6)},(_,i)=>makeForeignCandidate(i));}
+function generateForeignMarket(){return [...Array.from({length:5},(_,i)=>makeForeignCandidate(i,"pitcher")),...Array.from({length:5},(_,i)=>makeForeignCandidate(i+5,"hitter"))];}
 function projectedForeignMarketCount(team){
   let n=organizationCount(team);if(marketState?.mode!=="offseason")return n;
   const dec=marketState.foreignRenewalDecisions||{};for(const id of marketState.currentForeignIds||[]){if(dec[id]==="release"&&allPlayers(team).some(p=>p.id===Number(id)))n--;}
@@ -3015,7 +3033,7 @@ function closeSeasonLeaders(){document.getElementById("seasonLeadersModal").clas
 
 // -------------------- season --------------------
 
-const APP_VERSION="3.33";
+const APP_VERSION="3.34";
 const SAVE_SCHEMA=1;
 const SAVE_KEYS={auto:"baseballGM_save_auto",slot1:"baseballGM_save_slot1",slot2:"baseballGM_save_slot2",slot3:"baseballGM_save_slot3"};
 let saveSuspend=false,autosaveTimer=null,lastSaveStamp=0;
