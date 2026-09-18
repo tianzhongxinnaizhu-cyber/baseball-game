@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>Baseball GM v3.35</title>
+  <title>Baseball GM v3.36</title>
   <style>
 :root {
   --bg: #f3f5f8;
@@ -353,7 +353,7 @@ table{font-size:12.2px!important}th{font-size:11.3px!important}th,td{padding:7px
 @media(max-width:760px){.year-end-screen{padding:8px}.year-end-head{align-items:flex-start;flex-direction:column}.year-end-body{padding:10px}.year-end-summary{width:100%}}
 
 
-/* -------------------- v3.35 save / load -------------------- */
+/* -------------------- v3.34 save / load -------------------- */
 .save-status{font-size:11px;color:var(--muted);padding:7px 10px;border:1px solid var(--line);border-radius:999px;background:rgba(255,255,255,.72);white-space:nowrap}
 .save-status.saved{color:#177245;border-color:rgba(23,114,69,.25);background:rgba(232,248,239,.92)}
 .save-status.error{color:#a52a2a;border-color:rgba(165,42,42,.25);background:rgba(255,239,239,.92)}
@@ -368,7 +368,7 @@ table{font-size:12.2px!important}th{font-size:11.3px!important}th,td{padding:7px
 @media(max-width:680px){.save-slot{grid-template-columns:1fr}.save-slot-actions{justify-content:flex-start}.startup-actions{grid-template-columns:1fr}.save-status{display:none}}
 
 
-/* -------------------- v3.35 qualification + pinch alignment -------------------- */
+/* -------------------- v3.34 qualification + pinch alignment -------------------- */
 .pinch-order-item{grid-template-columns:44px minmax(120px,1fr) 58px 284px!important}
 .pinch-stat{min-width:0;width:100%}
 .pinch-abilities{display:grid!important;grid-template-columns:repeat(4,64px);justify-content:end;align-items:center;gap:6px!important;width:100%;font-variant-numeric:tabular-nums}
@@ -932,6 +932,24 @@ function makeHitter(pos, quality=50, opts={}) {
   syncTrajectory(p);
   return configureCareer(p,opts);
 }
+function pitcherFieldPositionPool(defense=45,arm=55){
+  const pool=["1B","LF","RF","3B"];
+  if(defense>=43)pool.push("CF");
+  if(defense>=50)pool.push("2B");
+  if(defense>=57)pool.push("SS");
+  if(defense>=58&&arm>=68)pool.push("C");
+  return pool;
+}
+function generatePitcherSubPositions(defense=45,arm=55,twoWay=false){
+  const pool=pitcherFieldPositionPool(defense,arm),out=[];
+  const firstWeights={"1B":4,"LF":3,"RF":3,"3B":2,"CF":defense>=50?2:1,"2B":defense>=56?2:1,"SS":defense>=62?2:1,"C":arm>=75?1:0};
+  const weighted=[];for(const pos of pool)for(let i=0;i<(firstWeights[pos]||1);i++)weighted.push(pos);
+  const first=choice(weighted.length?weighted:pool);if(first)out.push(first);
+  const secondChance=twoWay?.58:clamp(.18+(defense-40)*.008,.12,.46);
+  if(Math.random()<secondChance){const rest=pool.filter(x=>!out.includes(x));if(rest.length)out.push(choice(rest));}
+  if(twoWay&&defense>=60&&Math.random()<.24){const rest=pool.filter(x=>!out.includes(x));if(rest.length)out.push(choice(rest));}
+  return out;
+}
 function makePitcher(role="SP", quality=50, opts={}) {
   const stuff=talent(quality), control=talent(quality), stamina= role === "SP" ? talent(63) : talent(35), breaking=talent(quality);
   const twoWay=Math.random()<.012;
@@ -944,18 +962,33 @@ function makePitcher(role="SP", quality=50, opts={}) {
   }else{
     contact=clamp(Math.round(normal(28,9)),7,55); power=clamp(Math.round(normal(22,10)),4,56); speed=clamp(Math.round(normal(38,10)),12,68); eye=clamp(Math.round(normal(28,9)),7,58);
   }
+  const defense=clamp(Math.round(normal(twoWay?58:goodHitter?46:40,twoWay?9:10)),20,88);
+  const arm=clamp(Math.round(normal(54+(stuff-50)*.22+(twoWay?8:0),9)),30,93);
   const p={
     id:playerSeq++, type:"pitcher", name:namePlayer(), role,
     bullpenRoles: role === "SP" ? [] : [role],
     age:randInt(20,36), growthType:choice(["early","normal","late"]), injuryProneness:randInt(10,90),
     stuff, control, stamina, breaking, velocityOffset:randInt(-2,2), injuredGames:0, active:true,
-    contact,power,speed,eye,trajectory:null,trajectoryBias:normal(twoWay?2:goodHitter?0:-1,4),twoWay, batting:blankBatting(),
+    contact,power,speed,eye,defense,arm,subPositions:generatePitcherSubPositions(defense,arm,twoWay),fieldingInningsByPos:{},trajectory:null,trajectoryBias:normal(twoWay?2:goodHitter?0:-1,4),twoWay, batting:blankBatting(),
     pitching:blankPitching()
   };
   configureCareer(p,opts);
   syncTrajectory(p);
   const batNow=p.contact*.44+p.power*.39+p.speed*.10+p.eye*.07;
   p.battingPotential=twoWay?randInt(88,99):goodHitter?clamp(Math.round(batNow+rand(12,30)),50,90):clamp(Math.round(batNow+rand(8,24)),35,82);
+  const fldNow=p.defense*.62+p.arm*.38;
+  p.fieldingPotential=twoWay?clamp(Math.round(fldNow+rand(12,26)),65,97):clamp(Math.round(fldNow+rand(7,20)),42,88);
+  return p;
+}
+function ensurePitcherFielding(p){
+  if(!p||p.type!=="pitcher")return p;
+  if(!Number.isFinite(p.defense))p.defense=clamp(Math.round(normal(p.twoWay?58:40,10)),20,88);
+  if(!Number.isFinite(p.arm))p.arm=clamp(Math.round(normal(54+((p.stuff||50)-50)*.22+(p.twoWay?8:0),9)),30,93);
+  if(!Array.isArray(p.subPositions)||!p.subPositions.length)p.subPositions=generatePitcherSubPositions(p.defense,p.arm,!!p.twoWay);
+  p.subPositions=[...new Set(p.subPositions.filter(x=>FIELD_POSITIONS.includes(x)))];
+  if(!p.subPositions.length)p.subPositions=["1B"];
+  if(!p.fieldingInningsByPos)p.fieldingInningsByPos={};
+  if(!Number.isFinite(p.fieldingPotential)){const f=p.defense*.62+p.arm*.38;p.fieldingPotential=clamp(Math.round(f+rand(7,20)),42,p.twoWay?97:88);}
   return p;
 }
 function ensurePitcherBatting(p){
@@ -965,19 +998,24 @@ function ensurePitcherBatting(p){
   if(!Number.isFinite(p.speed))p.speed=clamp(Math.round(normal(38,10)),12,68);
   if(!Number.isFinite(p.eye))p.eye=clamp(Math.round(normal(28,9)),7,58);
   if(!Number.isFinite(p.trajectoryBias))p.trajectoryBias=normal(-1,4);
+  if(typeof p.twoWay!=="boolean")p.twoWay=false;
+  ensurePitcherFielding(p);
   syncTrajectory(p);
   if(!p.batting)p.batting=blankBatting();
-  if(typeof p.twoWay!=="boolean")p.twoWay=false;
   if(!Number.isFinite(p.battingPotential)){const b=p.contact*.44+p.power*.39+p.speed*.10+p.eye*.07;p.battingPotential=clamp(Math.round(b+rand(8,24)),35,82);}
   return p;
 }
 function pitcherBattingCard(p) {
   ensurePitcherBatting(p);
-  return {id:"P"+p.id, type:"pitcherBat", pitcherRef:p, name:p.name, pos:"P", contact:p.contact, power:p.power, speed:p.speed, defense:30, arm:30, eye:p.eye, trajectory:p.trajectory, batting:p.batting};
+  return {id:"P"+p.id, type:"pitcherBat", pitcherRef:p, name:p.name, pos:"P", contact:p.contact, power:p.power, speed:p.speed, defense:p.defense, arm:p.arm, eye:p.eye, trajectory:p.trajectory, batting:p.batting};
+}
+function positionPlayerOverall(p){
+  if(!p)return 0;if(p.type==="pitcher")ensurePitcherBatting(p);else ensurePlayerPositions(p);
+  return p.contact*.28+p.power*.25+p.speed*.12+(p.defense||0)*.22+(p.arm||0)*.08+p.eye*.05;
 }
 function playerOverall(p){
   if(p.type==="pitcher") return p.stuff*.32+p.control*.26+p.breaking*.27+p.stamina*.15;
-  return p.contact*.28+p.power*.25+p.speed*.12+p.defense*.22+p.arm*.08+p.eye*.05;
+  return positionPlayerOverall(p);
 }
 
 function abilitySnapshot(p,year=seasonYear){
@@ -992,7 +1030,7 @@ function saveAbilitySnapshot(p,year=seasonYear){
 }
 function seasonAbilitySnapshot(p,year=seasonYear){
   const s={year,age:p.age,type:p.type,contact:p.contact,power:p.power,speed:p.speed};
-  if(p.type==="pitcher")Object.assign(s,{stuff:p.stuff,control:p.control,stamina:p.stamina,breaking:p.breaking});
+  if(p.type==="pitcher"){ensurePitcherBatting(p);Object.assign(s,{stuff:p.stuff,control:p.control,stamina:p.stamina,breaking:p.breaking,defense:p.defense,arm:p.arm});}
   else Object.assign(s,{defense:p.defense,arm:p.arm});
   return s;
 }
@@ -1001,7 +1039,7 @@ function setAllSeasonAbilityBaselines(year=seasonYear){teams.forEach(t=>allPlaye
 function ensureSeasonAbilityBaseline(p,year=seasonYear){if(!p.seasonStartAbility||p.seasonStartAbility.year!==year)setSeasonAbilityBaseline(p,year);return p.seasonStartAbility;}
 function yearEndAttrs(p){
   return p.type==="pitcher"
-    ? [["球威","stuff"],["制球","control"],["スタミナ","stamina"],["変化球","breaking"],["打ミ","contact"],["打パ","power"],["走力","speed"]]
+    ? [["球威","stuff"],["制球","control"],["スタミナ","stamina"],["変化球","breaking"],["打ミ","contact"],["打パ","power"],["走力","speed"],["守備","defense"],["肩力","arm"]]
     : [["ミート","contact"],["パワー","power"],["走力","speed"],["守備","defense"],["肩力","arm"]];
 }
 function abilityChangeCell(a,b){
@@ -1019,7 +1057,7 @@ function buildYearEndRows(team){
 function yearEndStatus(team,p){return currentRosterLabel(team,p);}
 function renderYearEndTable(team,rows,type){
   rows=rows.filter(r=>r.p.type===type);if(!rows.length)return '<div class="summary-empty">該当選手はいません。</div>';
-  const labels=type==="pitcher"?["球威","制球","スタミナ","変化球","打ミ","打パ","走力"]:["ミート","パワー","走力","守備","肩力"];
+  const labels=type==="pitcher"?["球威","制球","スタミナ","変化球","打ミ","打パ","走力","守備","肩力"]:["ミート","パワー","走力","守備","肩力"];
   const body=rows.map(r=>{
     const p=r.p,cls=r.net>=8?"big-growth":r.net<0?"decline":"";
     const netCls=r.net>0?"up":r.net<0?"down":"flat",netText=r.net>0?`+${r.net}`:`${r.net}`;
@@ -1088,30 +1126,39 @@ function ensurePlayerPositions(p){
   if(!p.fieldingInningsByPos)p.fieldingInningsByPos={};
   return [p.pos,...p.subPositions];
 }
-function playerPositions(p){return p?.type==="hitter"?ensurePlayerPositions(p):[];}
-function canPlayPosition(p,pos){if(pos==="DH")return p?.type==="hitter" || (p?.type==="pitcher"&&p.twoWay);return p?.type==="hitter"&&playerPositions(p).includes(pos);}
-function effectiveDefense(p,pos){
-  if(!p||p.type!=="hitter")return 50;
-  if(pos==="DH")return 0;
-  if(!pos||pos===p.pos)return p.defense;
-  if(["LF","CF","RF"].includes(p.pos)&&["LF","CF","RF"].includes(pos))return clamp(p.defense-5,10,99);
-  return clamp(p.defense-8,10,99);
+function playerPositions(p){
+  if(p?.type==="hitter")return ensurePlayerPositions(p);
+  if(p?.type==="pitcher"){ensurePitcherFielding(p);return [...p.subPositions];}
+  return [];
 }
-function playerPositionsText(p){return p?.type==="hitter"?playerPositions(p).join(" / "):(p?.role==="SP"?"先発":pitcherRolesLabel(p));}
+function canPlayPosition(p,pos){if(!p)return false;if(pos==="DH")return p.type==="hitter"||p.type==="pitcher";return (p.type==="hitter"||p.type==="pitcher")&&playerPositions(p).includes(pos);}
+function effectiveDefense(p,pos){
+  if(!p||(p.type!=="hitter"&&p.type!=="pitcher"))return 50;
+  if(p.type==="pitcher")ensurePitcherFielding(p);
+  if(pos==="DH")return 0;
+  if(p.type==="hitter"){
+    if(!pos||pos===p.pos)return p.defense;
+    if(["LF","CF","RF"].includes(p.pos)&&["LF","CF","RF"].includes(pos))return clamp(p.defense-5,10,99);
+    return clamp(p.defense-8,10,99);
+  }
+  const idx=playerPositions(p).indexOf(pos);return clamp(p.defense-(idx<=0?0:5),10,99);
+}
+function playerPositionsText(p){if(!p)return "-";return playerPositions(p).join(" / ")||"-";}
 function positionFitScore(p,pos){
   if(!canPlayPosition(p,pos))return -999;
-  // DHは守備適性ではなく打撃力で選ぶ。全野手が候補になる。
+  // DHは守備適性ではなく打撃力で選ぶ。投手も打撃能力が高ければ候補になる。
   if(pos==="DH")return p.contact*.46+p.power*.39+p.eye*.15;
-  return playerOverall(p)+(p.pos===pos?5:0)+effectiveDefense(p,pos)*.03;
+  const pref=p.type==="hitter"&&p.pos===pos?5:playerPositions(p)[0]===pos?3:0;
+  return positionPlayerOverall(p)+pref+effectiveDefense(p,pos)*.03;
 }
 
 function buildLineup(team){
   const starters=[],slots=[];
   const required=team.dh ? ["C","1B","2B","3B","SS","LF","CF","RF","DH"] : ["C","1B","2B","3B","SS","LF","CF","RF"];
   required.forEach(pos=>{
-    const basePool=pos==="DH"?[...team.hitters,...team.pitchers.filter(p=>p.twoWay)]:team.hitters;
+    const basePool=[...team.hitters,...team.pitchers];
     let cands=basePool.filter(h=>h.injuredGames<=0&&!starters.includes(h)&&canPlayPosition(h,pos)).sort((a,b)=>positionFitScore(b,pos)-positionFitScore(a,pos));
-    if(!cands.length)cands=team.hitters.filter(h=>h.injuredGames<=0&&!starters.includes(h)).sort((a,b)=>playerOverall(b)-playerOverall(a));
+    if(!cands.length)cands=team.hitters.filter(h=>h.injuredGames<=0&&!starters.includes(h)).sort((a,b)=>positionPlayerOverall(b)-positionPlayerOverall(a));
     const p=cands[0];if(p){starters.push(p);slots.push(pos);}
   });
   const order=starters.map((p,i)=>({p,pos:slots[i],score:p.contact+p.power*.7+p.eye*.35})).sort((a,b)=>b.score-a.score);
@@ -1531,6 +1578,9 @@ function developPlayer(team,p,scale=1,label="月間育成"){
       if(p.twoWay)m*=1.45;
       applyAttributeProgress(team,p,a,normal(m*scale,.065*Math.sqrt(scale)),`${label}・打撃`);
     }
+    ensurePitcherFielding(p);
+    const fldNow=p.defense*.62+p.arm*.38,fldGap=(p.fieldingPotential??60)-fldNow,fldMul=clamp(fldGap/14,0,2.0);
+    for(const a of ["defense","arm"]){let m=stage==="growth"?.035*fldMul*envMul:stage==="pre"?.008*envMul:-.018*(1+Math.max(0,p.age-p.growthEndAge)*.08);if(p.twoWay)m*=1.35;applyAttributeProgress(team,p,a,normal(m*scale,.050*Math.sqrt(scale)),`${label}・野手守備`);}
   }
   // 能力成長に合わせて弾道も自然に変化する。
   syncTrajectory(p);
@@ -1560,13 +1610,15 @@ function promoteDevelopmentInSeason(playerId){
 }
 function gameLineup(team, pitcher){
   ensureLineupPositions(team);
-  const used=[];
+  const used=[],activePool=[...team.hitters,...team.pitchers];
   const starters=team.lineupOrder.map((st,i)=>{
-    const slotPos=team.lineupPositions[i]||st?.pos;
+    const slotPos=team.lineupPositions[i]||st?.pos||playerPositions(st)[0];
     let pick=null;
-    if(st&&st.injuredGames<=0&&canPlayPosition(st,slotPos)&&!used.includes(st))pick=st;
-    if(!pick){const gp=slotPos==="DH"?[...team.hitters,...team.pitchers.filter(p=>p.twoWay)]:team.hitters;pick=gp.filter(h=>h.injuredGames<=0&&!used.includes(h)&&canPlayPosition(h,slotPos)).sort((a,b)=>positionFitScore(b,slotPos)-positionFitScore(a,slotPos))[0]
-      ||team.hitters.filter(h=>h.injuredGames<=0&&!used.includes(h)).sort((a,b)=>playerOverall(b)-playerOverall(a))[0];}
+    const activeStarter=st&&activePool.includes(st);
+    // その試合の登板投手と同じ選手を同時に野手守備へ置かない。該当試合だけ自動で代替する。
+    if(activeStarter&&st!==pitcher&&st.injuredGames<=0&&canPlayPosition(st,slotPos)&&!used.includes(st))pick=st;
+    if(!pick){const gp=activePool.filter(h=>h!==pitcher);pick=gp.filter(h=>h.injuredGames<=0&&!used.includes(h)&&canPlayPosition(h,slotPos)).sort((a,b)=>positionFitScore(b,slotPos)-positionFitScore(a,slotPos))[0]
+      ||team.hitters.filter(h=>h.injuredGames<=0&&!used.includes(h)).sort((a,b)=>positionPlayerOverall(b)-positionPlayerOverall(a))[0];}
     if(pick){pick.gamePos=slotPos;used.push(pick);}return pick;
   }).filter(Boolean);
   if(team.dh) return starters;
@@ -1639,8 +1691,9 @@ function awardPitcherDecisions(winnerState, loserState, lastLeadEvent){
   }
 }
 
-function selectReliever(team, inning, scoreDiff, used){
-  const avail=team.bullpen.filter(p=>p.injuredGames<=0 && !used.has(p.id));
+function selectReliever(team, inning, scoreDiff, used, fieldingLineup=[]){
+  const fieldingPitcherIds=new Set((fieldingLineup||[]).filter(x=>x?.type==="pitcher"&&(x.gamePos||x.pos)!=="P").map(x=>x.id));
+  const avail=team.bullpen.filter(p=>p.injuredGames<=0 && !used.has(p.id) && !fieldingPitcherIds.has(p.id));
   avail.forEach(p=>ensureBullpenRoles(p));
   const byRole=r=>avail.filter(p=>hasBullpenRole(p,r)).sort((a,b)=>playerOverall(b)-playerOverall(a))[0];
   if(inning>=9 && scoreDiff>0 && scoreDiff<=3) return byRole("CL")||byRole("SU")||avail[0];
@@ -1692,7 +1745,7 @@ function simulateHalfInning(offTeam, offState, defTeam, defState, inning, homeSc
     runs += scored; defState.pitcher.pitching.ER += scored;
     defState.baserunners += (result==="BB"||result==="HBP"||["1B","2B","3B","HR"].includes(result))?1:0;
   }
-  defenseLineup().forEach(f=>{if(f.type==="hitter"){ensurePlayerPositions(f);const pos=f.gamePos||f.pos;f.fieldingInningsByPos[pos]=(f.fieldingInningsByPos[pos]||0)+1;}});
+  defenseLineup().forEach(f=>{if(f.type==="hitter"||f.type==="pitcher"){const pos=f.gamePos||f.pos;if(pos&&pos!=="P"&&pos!=="DH"){playerPositions(f);f.fieldingInningsByPos[pos]=(f.fieldingInningsByPos[pos]||0)+1;}}});
   defState.pitcher.pitching.outs += 3;
   appearance.outs += 3;
   appearance.exitLead = offIsAway ? homeScore-(awayScore+runs) : awayScore-(homeScore+runs);
@@ -1702,7 +1755,7 @@ function simulateHalfInning(offTeam, offState, defTeam, defState, inning, homeSc
 
 function changePitcherIfNeeded(team,state,inning,scoreDiff){
   if(state.forcePitcherChange || shouldPullStarter(state.pitcher,inning,state.runsAllowed,state.baserunners) || state.pitcher.injuredGames>0){
-    const rp=selectReliever(team,inning,scoreDiff,state.usedRelievers);
+    const rp=selectReliever(team,inning,scoreDiff,state.usedRelievers,state.lineup);
     if(rp && rp!==state.pitcher){
       state.pitcher=rp; state.usedRelievers.add(rp.id);
       if(!team.dh && Array.isArray(state.batOrder)){
@@ -1915,7 +1968,7 @@ function makeDraftCandidate(tier,index){
   // 下位候補にもごくまれに超高潜在能力の「隠れた大物」を混ぜる。
   if(Math.random()<(category==="highschool"?.035:.018)){p.potential=Math.max(p.potential,randInt(92,99));p.hiddenSuperstar=true;}
   // 高校・大学の投手には、ごくまれに本格的な二刀流素材が現れる。
-  if(p.type==="pitcher" && !p.twoWay && ["highschool","university"].includes(category) && Math.random()<.018){p.twoWay=true;p.contact=randInt(62,84);p.power=randInt(64,88);p.speed=randInt(52,82);p.eye=randInt(52,82);p.trajectoryBias=normal(2,4);syncTrajectory(p);p.battingPotential=randInt(90,99);}
+  if(p.type==="pitcher" && !p.twoWay && ["highschool","university"].includes(category) && Math.random()<.018){p.twoWay=true;p.contact=randInt(62,84);p.power=randInt(64,88);p.speed=randInt(52,82);p.eye=randInt(52,82);p.defense=clamp(Math.max(p.defense||0,randInt(52,76)),10,99);p.arm=clamp(Math.max(p.arm||0,randInt(58,84)),10,99);p.subPositions=generatePitcherSubPositions(p.defense,p.arm,true);p.fieldingPotential=randInt(82,98);p.trajectoryBias=normal(2,4);syncTrajectory(p);p.battingPotential=randInt(90,99);}
   const uncertainty=category==="highschool"?12:category==="university"?8:category==="corporate"?5:8;
   const value=current*.48+p.potential*.52+(tier==="elite"?8:tier==="upper"?3:0)+normal(0,2.5);
   const affiliation=choice(DRAFT_AFFILIATIONS[category]),achievement=makeDraftAchievement(category,p,tier);
@@ -2206,7 +2259,7 @@ function renderDraftRoundCards(round){
 }
 function setDraftTeamView(mode){if(!draftState)return;draftState.teamInfoMode=mode;renderDraftScreen();}
 function seasonStarterAt(team,pos){
-  return allPlayers(team).filter(p=>p.type==="hitter"&&playerPositions(p).includes(pos)).sort((a,b)=>(b.fieldingInningsByPos?.[pos]||0)-(a.fieldingInningsByPos?.[pos]||0)||b.batting.PA-a.batting.PA)[0]||null;
+  return allPlayers(team).filter(p=>(p.type==="hitter"||p.type==="pitcher")&&canPlayPosition(p,pos)).sort((a,b)=>(b.fieldingInningsByPos?.[pos]||0)-(a.fieldingInningsByPos?.[pos]||0)||b.batting.PA-a.batting.PA)[0]||null;
 }
 function draftTeamStartersHtml(team){
   const posList=team.dh?["C","1B","2B","3B","SS","LF","CF","RF","DH"]:["C","1B","2B","3B","SS","LF","CF","RF"];
@@ -2270,7 +2323,7 @@ function renderDraftCandidateDetail(c){
   const devNote=draftState.phase==="development"?"<br><strong>育成選手として入団します。一軍登録には支配下登録が必要です。</strong>":"";
   const canEnd=isTurn&&!firstReady&&(draftState.phase==="development"||draftState.round>=2);
   const draftedLocked=(c.draftedBy != null)&&!(firstReady&&c.draftedBy===managedTeamId);
-  el.innerHTML=`<div class="eyebrow">${c.rankLabel} / ${DRAFT_CATEGORY_JP[c.category]}${recRank?`　<span class="ai-reco-badge">AI推奨 ${recRank}</span>`:""}</div><div class="candidate-name">${p.name}</div><div class="candidate-meta">${p.age}歳・${draftPosLabel(c)}${p.type==="hitter"?`（${playerPositionsText(p)}）`:""}・${c.bats}<br>${c.affiliation}</div><div class="rating-grid">${ratings}</div><div class="candidate-achievement"><strong>${c.achievement.headline}</strong><br>${c.achievement.detail}</div><div class="draft-sub">能力評価には不確実性があります。選球眼・成長型・潜在能力など一部の内部値は表示されません。${devNote}${recRank?`<br><span class="draft-sort-note">編成AI: ${draftReason(teams[managedTeamId],c)}</span>`:""}${firstReady?`<br><strong>全球団の第1巡入札が出揃いました。指名ボードを確認してから次へ進めます。</strong>`:""}</div><div class="draft-action-row"><button class="primary" ${!isTurn||draftedLocked||noSlots?"disabled":""} onclick="${action}">${btnLabel}</button>${canEnd?`<button class="secondary draft-end" onclick="userEndDraft()">選択終了</button>`:""}</div>`;
+  el.innerHTML=`<div class="eyebrow">${c.rankLabel} / ${DRAFT_CATEGORY_JP[c.category]}${recRank?`　<span class="ai-reco-badge">AI推奨 ${recRank}</span>`:""}</div><div class="candidate-name">${p.name}</div><div class="candidate-meta">${p.age}歳・${draftPosLabel(c)}${p.type==="hitter"?`（${playerPositionsText(p)}）`:`（野手 ${playerPositionsText(p)}）`}・${c.bats}<br>${c.affiliation}</div><div class="rating-grid">${ratings}</div><div class="candidate-achievement"><strong>${c.achievement.headline}</strong><br>${c.achievement.detail}</div><div class="draft-sub">能力評価には不確実性があります。選球眼・成長型・潜在能力など一部の内部値は表示されません。${devNote}${recRank?`<br><span class="draft-sort-note">編成AI: ${draftReason(teams[managedTeamId],c)}</span>`:""}${firstReady?`<br><strong>全球団の第1巡入札が出揃いました。指名ボードを確認してから次へ進めます。</strong>`:""}</div><div class="draft-action-row"><button class="primary" ${!isTurn||draftedLocked||noSlots?"disabled":""} onclick="${action}">${btnLabel}</button>${canEnd?`<button class="secondary draft-end" onclick="userEndDraft()">選択終了</button>`:""}</div>`;
 }
 function renderDraftScreen(){
   if(!draftState?.active)return;
@@ -2325,7 +2378,7 @@ function showDraftSummary(){
   }).join("");
   const mineReg=(draftState.picks?.[managedTeamId]||[]).map(x=>({...x,isDev:false})),mineDev=(draftState.developmentPicks?.[managedTeamId]||[]).map(x=>({...x,isDev:true})),mine=[...mineReg,...mineDev];
   document.getElementById("draftSummaryMyCount").textContent=`${mine.length}人獲得`;
-  document.getElementById("draftSummaryMyPlayers").innerHTML=mine.map(x=>{const p=x.candidate.player;return `<div class="draft-summary-player"><div class="pick-label">${x.isDev?'育成':''}${x.round}位 / ${x.candidate.categoryLabel||x.candidate.category||''}</div><div class="name">${p.name}${p.twoWay?' <span class="two-way-badge">二刀流</span>':''}</div><div class="meta">${p.age}歳 / ${p.type==='pitcher'?'投手':playerPositionsText(p)} / ${x.candidate.affiliation||''}</div>${draftSummaryAbilityItems(p)}</div>`;}).join("")||'<div class="summary-empty">自チームの指名選手はいません。</div>';
+  document.getElementById("draftSummaryMyPlayers").innerHTML=mine.map(x=>{const p=x.candidate.player;return `<div class="draft-summary-player"><div class="pick-label">${x.isDev?'育成':''}${x.round}位 / ${x.candidate.categoryLabel||x.candidate.category||''}</div><div class="name">${p.name}${p.twoWay?' <span class="two-way-badge">二刀流</span>':''}</div><div class="meta">${p.age}歳 / ${p.type==='pitcher'?`投手・野手 ${playerPositionsText(p)}`:playerPositionsText(p)} / ${x.candidate.affiliation||''}</div>${draftSummaryAbilityItems(p)}</div>`;}).join("")||'<div class="summary-empty">自チームの指名選手はいません。</div>';
 }
 function continueAfterDraftSummary(){
   if(!draftState?.completed)return;document.getElementById("draftSummaryScreen").classList.add("hidden");finishDraftAndNextSeason();
@@ -2455,7 +2508,7 @@ function specialTrainingAbilityCell(v){return `<span class="special-training-abi
 function specialTrainingPlayerRow(p,selected=false){
   if(p.type==="pitcher")ensurePitcherBatting(p);
   const vals=p.type==="pitcher"?[p.stuff,p.control,p.stamina,p.breaking,p.contact,p.power,p.speed,null,null]:[null,null,null,null,p.contact,p.power,p.speed,p.defense,p.arm];
-  const meta=p.type==="pitcher"?`${pitcherRolesLabel(p)} / ${p.age}歳`:`${playerPositionsText(p)} / ${p.age}歳`;
+  const meta=p.type==="pitcher"?`${pitcherRolesLabel(p)} / 野手 ${playerPositionsText(p)} / ${p.age}歳`:`${playerPositionsText(p)} / ${p.age}歳`;
   return `<button type="button" class="special-training-player-row ${selected?'selected':''}" data-player-id="${p.id}" onclick="selectSpecialTrainingPlayer(${p.id})"><span class="special-training-player-main"><span class="special-training-player-name">${p.name}${p.twoWay?'<span class="two-way-badge">二刀流</span>':''}</span><span class="special-training-player-meta">${meta}</span></span>${vals.map(v=>specialTrainingAbilityCell(v)).join("")}</button>`;
 }
 function renderSpecialTraining(team){
@@ -2813,7 +2866,7 @@ function playerAwards(id){
 }
 function playerTransactions(id){return (recordBook.transactions||[]).filter(x=>x.playerId===Number(id)||x.faPlayerId===Number(id)).sort((a,b)=>b.year-a.year);}
 function playerSeasonRows(id){return (recordBook.playerSeasons||[]).filter(x=>x.playerId===Number(id)).sort((a,b)=>a.year-b.year);}
-function pitcherBattingAbilityHtml(p){ensurePitcherBatting(p);return `<div class="pitcher-bat-ability">${abilityItem("ミート",p.contact)}${abilityItem("パワー",p.power)}${abilityItem("走力",p.speed)}${trajectoryDisplay(p.trajectory)}</div>`;}
+function pitcherBattingAbilityHtml(p){ensurePitcherBatting(p);return `<div class="pitcher-bat-ability"><span class="career-chip">守備 ${playerPositionsText(p)}</span>${abilityItem("ミート",p.contact)}${abilityItem("パワー",p.power)}${abilityItem("走力",p.speed)}${abilityItem("守備",p.defense)}${abilityItem("肩力",p.arm)}${trajectoryDisplay(p.trajectory)}</div>`;}
 function maxVelocity(p){ return Math.round(120 + (p.stuff||0)*0.5 + (p.velocityOffset||0)); }
 function pitcherPitchingAbilityHtml(p){return `<div class="pitcher-bat-ability">${abilityItem("球威",p.stuff)}${abilityItem("制球",p.control)}${abilityItem("スタミナ",p.stamina)}${abilityItem("変化球",p.breaking)}<span class="career-chip">最速 ${Math.round(120+p.stuff*.5+(p.velocityOffset||0))}km/h</span></div>`;}
 function detailAbilityHtml(p){
@@ -2841,7 +2894,7 @@ function renderAbilityHistory(p){
 function openPlayerDetail(id){
   const found=findPlayerAnywhere(id);if(!found)return;const p=found.player,teamName=found.team?.name||p.formerTeam||"-",awards=playerAwards(p.id),moves=playerTransactions(p.id),inj=p.injuryHistory||[];
   document.getElementById("playerDetailName").textContent=p.name;
-  document.getElementById("playerDetailMeta").textContent=`${p.type==="pitcher"?pitcherRolesLabel(p):playerPositionsText(p)} / ${p.age}歳 / ${found.status} / ${teamName}${p.twoWay?" / 二刀流":""}`;
+  document.getElementById("playerDetailMeta").textContent=`${p.type==="pitcher"?`${pitcherRolesLabel(p)} / 野手 ${playerPositionsText(p)}`:playerPositionsText(p)} / ${p.age}歳 / ${found.status} / ${teamName}${p.twoWay?" / 二刀流":""}`;
   const awardHtml=awards.length?awards.slice(0,18).map(a=>`<div class="detail-list-row"><span class="label">${a.year}</span><span class="value">${a.label}${a.extra?`　${a.extra}`:""}</span></div>`).join(""):'<div class="summary-empty">受賞歴なし</div>';
   const moveHtml=moves.length?moves.slice(0,20).map(x=>`<div class="detail-list-row"><span class="label">${x.year} ${x.type}</span><span class="value">${x.text}</span></div>`).join(""):'<div class="summary-empty">移籍・入団履歴なし</div>';
   const injuryHtml=inj.length?[...inj].reverse().map(x=>`<div class="detail-list-row"><span class="label">${x.year}</span><span class="value">${x.label||"負傷"} / 約${x.games}試合離脱</span></div>`).join(""):'<div class="summary-empty">けが履歴なし</div>';
@@ -2863,15 +2916,15 @@ function createRecordBook(){return {seasons:[],playerSeasons:[],awards:[],transa
 function recordTransaction(type,text,data={}){recordBook.transactions.unshift({year:seasonYear,type,text,...data});}
 function hitterAwardScore(p){const s=p.batting,m=battingMetrics(p);return m.ops*105+s.HR*.85+s.RBI*.22+s.SB*.12+s.H*.045;}
 function pitcherAwardScore(p){const s=p.pitching,m=pitchingMetrics(p),ip=s.outs/3;if(ip<10)return -999;return 125-m.era*13+s.W*3+s.SO*.13+s.SV*.55+(s.HLD||0)*.28+Math.min(20,ip*.045);}
-function playerAwardScore(p){return p.type==="hitter"?hitterAwardScore(p):pitcherAwardScore(p);}
+function playerAwardScore(p){if(p.type==="hitter")return hitterAwardScore(p);const ps=pitcherAwardScore(p),hs=(p.batting?.PA||0)>=80?hitterAwardScore(p):-999;return Math.max(ps,hs);}
 function snapshotPlayerSeason(team,p){
   const base={year:seasonYear,teamId:team.id,teamName:team.name,league:team.league,playerId:p.id,name:p.name,type:p.type,pos:p.type==="pitcher"?(p.role||"P"):(p.pos||""),age:p.age,draftedYear:p.draftedYear??null,developmentDraft:!!p.developmentDraft};
   if(p.type==="hitter"){const s=JSON.parse(JSON.stringify(p.batting)),m=battingMetrics(p);return {...base,stats:s,avg:m.avg,obp:m.obp,slg:m.slg,ops:m.ops};}
-  const s=JSON.parse(JSON.stringify(p.pitching)),m=pitchingMetrics(p);return {...base,stats:s,era:m.era,whip:m.whip,ip:s.outs/3};
+  const s=JSON.parse(JSON.stringify(p.pitching)),m=pitchingMetrics(p),bs=JSON.parse(JSON.stringify(p.batting||blankBatting())),bm=battingMetrics(p);return {...base,stats:s,battingStats:bs,battingAvg:bm.avg,battingOps:bm.ops,fieldPositions:playerPositions(p),era:m.era,whip:m.whip,ip:s.outs/3};
 }
 function awardLine(label,p,extra=""){return {label,playerId:p.id,name:p.name,teamName:teams.find(t=>allPlayers(t).some(x=>x.id===p.id))?.name||"-",extra};}
 function calculateLeagueAwards(league){
-  const lteams=teams.filter(t=>t.league===league),hitters=lteams.flatMap(t=>t.hitters.concat(t.minors.filter(p=>p.type==="hitter"))).filter(p=>p.batting.PA>0),pitchers=lteams.flatMap(t=>t.pitchers.concat(t.minors.filter(p=>p.type==="pitcher"))).filter(p=>p.pitching.G>0);
+  const lteams=teams.filter(t=>t.league===league),hitters=lteams.flatMap(t=>allPlayers(t)).filter(p=>(p.batting?.PA||0)>0),pitchers=lteams.flatMap(t=>allPlayers(t)).filter(p=>p.type==="pitcher"&&p.pitching.G>0);
   const paMin=fullSeasonRegulationPA(),qH=hitters.filter(p=>p.batting.PA>=paMin),qP=pitchers.filter(p=>p.pitching.outs>=429);
   const by=(arr,fn)=>arr.length?[...arr].sort((a,b)=>fn(b)-fn(a))[0]:null;
   const min=(arr,fn)=>arr.length?[...arr].sort((a,b)=>fn(a)-fn(b))[0]:null;
@@ -2881,9 +2934,9 @@ function calculateLeagueAwards(league){
   const winPctPool=pitchers.filter(p=>p.pitching.W>=13&&(p.pitching.W+p.pitching.L)>0),winPct=by(winPctPool,p=>p.pitching.W/(p.pitching.W+p.pitching.L));
   if(avg)awards.push(awardLine("首位打者",avg,fmt3(battingMetrics(avg).avg)));if(hits)awards.push(awardLine("最多安打",hits,`${hits.batting.H}安打`));if(hr)awards.push(awardLine("本塁打王",hr,`${hr.batting.HR}本`));if(rbi)awards.push(awardLine("打点王",rbi,`${rbi.batting.RBI}打点`));if(sb)awards.push(awardLine("盗塁王",sb,`${sb.batting.SB}盗塁`));
   if(wins)awards.push(awardLine("最多勝",wins,`${wins.pitching.W}勝`));if(winPct)awards.push(awardLine("最高勝率",winPct,(winPct.pitching.W/(winPct.pitching.W+winPct.pitching.L)).toFixed(3).replace(/^0/,"")));if(era)awards.push(awardLine("最優秀防御率",era,pitchingMetrics(era).era.toFixed(2)));if(so)awards.push(awardLine("最多奪三振",so,`${so.pitching.SO}`));if(hld)awards.push(awardLine("最多ホールド",hld,`${hld.pitching.HLD||0}H`));if(sv)awards.push(awardLine("最多セーブ",sv,`${sv.pitching.SV}S`));
-  const all=[...hitters,...pitchers].filter(p=>(p.type==="hitter"?p.batting.PA:p.pitching.G)>0),mvp=by(all,playerAwardScore);if(mvp)awards.push(awardLine("MVP",mvp,""));
+  const all=[...new Map([...hitters,...pitchers].map(p=>[p.id,p])).values()].filter(p=>(p.batting?.PA||0)>0||(p.pitching?.G||0)>0),mvp=by(all,playerAwardScore);if(mvp)awards.push(awardLine("MVP",mvp,""));
   const rookies=all.filter(p=>p.draftedYear===seasonYear&&!p.isForeign),roy=by(rookies,playerAwardScore);if(roy)awards.push(awardLine("新人王",roy,""));
-  const bn=[];const pickPos=(pos,count=1)=>{let pool;if(pos==="DH")pool=hitters.filter(p=>!bn.some(x=>x.player.id===p.id));else pool=hitters.filter(p=>pos==="OF"?["LF","CF","RF"].includes(p.pos):p.pos===pos);pool=pool.sort((a,b)=>hitterAwardScore(b)-hitterAwardScore(a)).slice(0,count);pool.forEach(p=>bn.push({pos,player:p}));};
+  const bn=[];const pickPos=(pos,count=1)=>{let pool;if(pos==="DH")pool=hitters.filter(p=>!bn.some(x=>x.player.id===p.id));else if(pos==="OF")pool=hitters.filter(p=>["LF","CF","RF"].some(x=>canPlayPosition(p,x)));else pool=hitters.filter(p=>canPlayPosition(p,pos));pool=pool.filter(p=>!bn.some(x=>x.player.id===p.id)).sort((a,b)=>hitterAwardScore(b)-hitterAwardScore(a)).slice(0,count);pool.forEach(p=>bn.push({pos,player:p}));};
   ["C","1B","2B","3B","SS"].forEach(x=>pickPos(x));pickPos("OF",3);if(league==="B")pickPos("DH");const bp=by(pitchers,p=>pitcherAwardScore(p));if(bp)bn.unshift({pos:"P",player:bp});
   bn.forEach(x=>awards.push(awardLine(`ベストナイン ${x.pos}`,x.player,"")));
   return {league,awards};
@@ -2988,7 +3041,7 @@ function runJapanSeriesGame(){
   else if(inSeries){const won=(my.id===home.id&&r.homeScore>r.awayScore)||(my.id===away.id&&r.awayScore>r.homeScore),tie=r.homeScore===r.awayScore;showPostseasonPopup(`日本シリーズ 第${g}戦`,tie?"引き分け":won?"勝利":"敗戦",`${j.a.name} ${j.aw}勝 - ${j.bw}勝 ${j.b.name}${j.ties?`（${j.ties}分）`:""}`,line,tie?"":won?"win":"lose");}
 }
 function currentSeasonLeaders(league){
-  const lteams=teams.filter(t=>t.league===league),hitters=lteams.flatMap(t=>allPlayers(t).filter(p=>p.type==="hitter"&&p.batting.PA>0)),pitchers=lteams.flatMap(t=>allPlayers(t).filter(p=>p.type==="pitcher"&&p.pitching.G>0));
+  const lteams=teams.filter(t=>t.league===league),hitters=lteams.flatMap(t=>allPlayers(t).filter(p=>(p.batting?.PA||0)>0)),pitchers=lteams.flatMap(t=>allPlayers(t).filter(p=>p.type==="pitcher"&&p.pitching.G>0));
   const paMin=fullSeasonRegulationPA(),qH=hitters.filter(p=>p.batting.PA>=paMin),qP=pitchers.filter(p=>p.pitching.outs>=429),winPctPool=pitchers.filter(p=>p.pitching.W>=13&&(p.pitching.W+p.pitching.L)>0);const by=(a,f)=>a.length?[...a].sort((x,y)=>f(y)-f(x))[0]:null,min=(a,f)=>a.length?[...a].sort((x,y)=>f(x)-f(y))[0]:null;
   const all=[...hitters,...pitchers].filter(p=>(p.type==="hitter"?p.batting.PA:p.pitching.G)>0),mvp=by(all,playerAwardScore);
   const data=[
@@ -3004,7 +3057,7 @@ let liveLeaderLeague="A";
 function liveLeaguePlayers(league){return teams.filter(t=>t.league===league).flatMap(t=>allPlayers(t).map(p=>({p,team:t})));}
 function liveLeaderCards(league){
   const lteams=teams.filter(t=>t.league===league),avgGames=lteams.reduce((s,t)=>s+t.wins+t.losses+t.ties,0)/Math.max(1,lteams.length),paMin=regulationPAForGames(avgGames),outMin=Math.max(3,Math.floor(avgGames*3));
-  const all=liveLeaguePlayers(league),hit=all.filter(x=>x.p.type==='hitter'&&(x.p.batting?.PA||0)>0),pit=all.filter(x=>x.p.type==='pitcher'&&(x.p.pitching?.G||0)>0),qH=hit.filter(x=>(x.p.batting?.PA||0)>=paMin),qP=pit.filter(x=>(x.p.pitching?.outs||0)>=outMin);
+  const all=liveLeaguePlayers(league),hit=all.filter(x=>(x.p.batting?.PA||0)>0),pit=all.filter(x=>x.p.type==='pitcher'&&(x.p.pitching?.G||0)>0),qH=hit.filter(x=>(x.p.batting?.PA||0)>=paMin),qP=pit.filter(x=>(x.p.pitching?.outs||0)>=outMin);
   const top=(arr,val,n=5,asc=false)=>[...arr].sort((a,b)=>asc?val(a)-val(b):val(b)-val(a)).slice(0,n);
   const defs=[
     ['打率',top(qH,x=>battingMetrics(x.p).avg),x=>fmt3(battingMetrics(x.p).avg)],['安打',top(hit,x=>x.p.batting.H),x=>`${x.p.batting.H}`],['本塁打',top(hit,x=>x.p.batting.HR),x=>`${x.p.batting.HR}`],['打点',top(hit,x=>x.p.batting.RBI),x=>`${x.p.batting.RBI}`],['盗塁',top(hit,x=>x.p.batting.SB),x=>`${x.p.batting.SB}`],['OPS',top(qH,x=>battingMetrics(x.p).ops),x=>fmt3(battingMetrics(x.p).ops)],
@@ -3035,7 +3088,7 @@ function closeSeasonLeaders(){document.getElementById("seasonLeadersModal").clas
 
 // -------------------- season --------------------
 
-const APP_VERSION="3.35";
+const APP_VERSION="3.36";
 const SAVE_SCHEMA=1;
 const SAVE_KEYS={auto:"baseballGM_save_auto",slot1:"baseballGM_save_slot1",slot2:"baseballGM_save_slot2",slot3:"baseballGM_save_slot3"};
 let saveSuspend=false,autosaveTimer=null,lastSaveStamp=0;
@@ -3208,7 +3261,7 @@ function bootGame(){
 
 let teams=[], schedule=[], monthIndex=-1, selectedTeamId=0, managedTeamId=null, logs=[], seasonYear=2026;
 let lineupViewMode="order", pitchingViewMode="usage", postseasonPhase="regular", postseasonData={leagues:[],leagueWinners:[],japan:null,champion:null}, draftState=null;
-function resetPlayerSeasonStats(p){ if(p.type==="pitcher"){p.pitching=blankPitching();p.batting=blankBatting();} else {p.batting=blankBatting();p.fieldingInningsByPos={};} }
+function resetPlayerSeasonStats(p){ if(p.type==="pitcher"){p.pitching=blankPitching();p.batting=blankBatting();p.fieldingInningsByPos={};} else {p.batting=blankBatting();p.fieldingInningsByPos={};} }
 function resetTeamSeason(team){
   team.wins=0; team.losses=0; team.ties=0; team.runsFor=0; team.runsAgainst=0; team.rotationIndex=0; team.monthResults=[];
   allPlayers(team).forEach(resetPlayerSeasonStats); rebuildTeamUsage(team);
@@ -3282,7 +3335,7 @@ function moveLineup(slot,dir){
   [team.lineupOrder[slot],team.lineupOrder[j]]=[team.lineupOrder[j],team.lineupOrder[slot]]; render();
 }
 function replaceLineupPlayer(slot,playerId){
-  if(!isManagedView()) return; const team=teams[managedTeamId];ensureLineupPositions(team);const old=team.lineupOrder[slot];const targetPos=team.lineupPositions[slot]||old?.pos; const pool=targetPos==="DH"?[...team.hitters,...team.pitchers.filter(p=>p.twoWay)]:team.hitters; const next=pool.find(p=>p.id===Number(playerId));
+  if(!isManagedView()) return; const team=teams[managedTeamId];ensureLineupPositions(team);const old=team.lineupOrder[slot];const targetPos=team.lineupPositions[slot]||old?.pos||playerPositions(old)[0]; const pool=[...team.hitters,...team.pitchers]; const next=pool.find(p=>p.id===Number(playerId));
   if(!old||!next||next.injuredGames>0||!canPlayPosition(next,targetPos)) return;
   const other=team.lineupOrder.findIndex((p,i)=>i!==slot && p.id===next.id);
   if(other>=0){const otherPos=team.lineupPositions[other]||next.pos;if(!canPlayPosition(old,otherPos))return;team.lineupOrder[other]=old;} else { const bi=team.pinchPriority.findIndex(p=>p.id===next.id); if(bi>=0) team.pinchPriority[bi]=old; }
@@ -3313,6 +3366,9 @@ function manualRosterSwap(minorId,activeId){
     }
     normalizePinchPriority(team);
   }else{
+    ensureLineupPositions(team);
+    const li=team.lineupOrder.findIndex(p=>p.id===active.id);
+    if(li>=0){const slotPos=team.lineupPositions[li]||playerPositions(active)[0];if(canPlayPosition(minor,slotPos))team.lineupOrder[li]=minor;else{const used=new Set(team.lineupOrder.filter((_,i)=>i!==li).map(x=>x.id));const repl=[...team.hitters,...team.pitchers].filter(h=>!used.has(h.id)&&h.id!==active.id&&h.injuredGames<=0&&canPlayPosition(h,slotPos)).sort((a,b)=>positionFitScore(b,slotPos)-positionFitScore(a,slotPos))[0];if(repl)team.lineupOrder[li]=repl;}}
     const ri=team.rotation.findIndex(p=>p.id===active.id);
     if(ri>=0){ minor.role="SP"; minor.bullpenRoles=[]; team.rotation[ri]=minor; }
     else { minor.role=active.role||"MR"; minor.bullpenRoles=[...ensureBullpenRoles(active)]; }
@@ -3362,8 +3418,8 @@ function openUsageSwapModal(kind,slot){
   if(kind==="lineup"){
     ensureLineupPositions(team);
     source=team.lineupOrder[slot]; if(!source)return;
-    const slotPos=team.lineupPositions?.[slot]||source.pos;
-    const lineupPool=slotPos==="DH"?[...team.hitters,...team.pitchers.filter(p=>p.twoWay)]:team.hitters;
+    const slotPos=team.lineupPositions?.[slot]||source.pos||playerPositions(source)[0];
+    const lineupPool=[...team.hitters,...team.pitchers];
     candidates=lineupPool.filter(p=>{
       if(p.id===source.id||p.injuredGames>0||!canPlayPosition(p,slotPos))return false;
       const other=team.lineupOrder.findIndex((x,i)=>i!==slot&&x.id===p.id);
@@ -3378,9 +3434,9 @@ function openUsageSwapModal(kind,slot){
     title=`先発ローテ ${slot+1}番手を入れ替え`;
     subtitle="一軍投手から選択";
   }else return;
-  const sourceMeta=source.type==="pitcher"?`${pitcherRolesLabel(source)} / ${source.age}歳`:`${playerPositionsText(source)} / ${source.age}歳`;
+  const sourceMeta=source.type==="pitcher"?`${pitcherRolesLabel(source)} / 野手 ${playerPositionsText(source)} / ${source.age}歳`:`${playerPositionsText(source)} / ${source.age}歳`;
   const cards=candidates.map(p=>{
-    const meta=p.type==="pitcher"?`${pitcherRolesLabel(p)} / ${p.age}歳`:`${playerPositionsText(p)} / ${p.age}歳`;
+    const meta=p.type==="pitcher"?`${pitcherRolesLabel(p)} / 野手 ${playerPositionsText(p)} / ${p.age}歳`:`${playerPositionsText(p)} / ${p.age}歳`;
     const action=kind==="lineup"?`replaceLineupPlayer(${slot},${p.id})`:`setRotationSlot(${slot},${p.id})`;
     return `<button class="swap-candidate-card" onclick="${action};closeUsageSwapModal()"><div class="name">${p.name}</div><div class="meta">${meta}</div>${abilityCluster(p)}${p.type==="pitcher"?pitcherBattingAbilityHtml(p):""}<div class="stats">${rosterSwapStats(p)}</div></button>`;
   }).join("")||`<div class="summary-empty">入れ替え可能な選手がいません。</div>`;
@@ -3419,15 +3475,13 @@ function setLineupView(mode){ lineupViewMode=mode; render(); }
 function setPitchingView(mode){ pitchingViewMode=mode; render(); }
 function leaguePlayerPool(league,type){return teams.filter(t=>t.league===league).flatMap(t=>allPlayers(t)).filter(p=>p.type===type);}
 function statRankInfo(player,metric){
-  const team=teams.find(t=>allPlayers(t).some(x=>x.id===player.id));if(!team)return 99;const games=Math.max(...teams.filter(t=>t.league===team.league).map(t=>t.wins+t.losses+t.ties),1),pool=leaguePlayerPool(team.league,player.type);let arr=[],val=0,asc=false;
-  if(player.type==="hitter"){
-    const qual=regulationPAForGames(games);arr=(metric==="avg"||metric==="ops")?pool.filter(p=>p.batting.PA>=qual):pool;const f={avg:p=>battingMetrics(p).avg,H:p=>p.batting.H,HR:p=>p.batting.HR,RBI:p=>p.batting.RBI,SB:p=>p.batting.SB,ops:p=>battingMetrics(p).ops}[metric];if(!f||!arr.includes(player))return 99;val=f(player);arr.sort((a,b)=>f(b)-f(a));
-  }else{
-    const ipQual=Math.max(3,Math.floor(games*3)*1),winQual=Math.max(1,Math.floor(games*13/143));
-    if(metric==="era"){arr=pool.filter(p=>p.pitching.outs>=ipQual);asc=true;}else if(metric==="winPct")arr=pool.filter(p=>p.pitching.W>=winQual&&(p.pitching.W+p.pitching.L)>0);else arr=pool;
-    const f={W:p=>p.pitching.W,SO:p=>p.pitching.SO,HLD:p=>(p.pitching.HLD||0),SV:p=>p.pitching.SV,era:p=>pitchingMetrics(p).era,winPct:p=>p.pitching.W/Math.max(1,p.pitching.W+p.pitching.L)}[metric];if(!f||!arr.includes(player))return 99;val=f(player);arr.sort((a,b)=>asc?f(a)-f(b):f(b)-f(a));
-  }
-  const eps=1e-10,better=arr.filter(p=>{let v;if(player.type==="hitter"){const f={avg:q=>battingMetrics(q).avg,H:q=>q.batting.H,HR:q=>q.batting.HR,RBI:q=>q.batting.RBI,SB:q=>q.batting.SB,ops:q=>battingMetrics(q).ops}[metric];v=f(p);}else{const f={W:q=>q.pitching.W,SO:q=>q.pitching.SO,HLD:q=>(q.pitching.HLD||0),SV:q=>q.pitching.SV,era:q=>pitchingMetrics(q).era,winPct:q=>q.pitching.W/Math.max(1,q.pitching.W+q.pitching.L)}[metric];v=f(p);}return asc?v<val-eps:v>val+eps;}).length;return better+1;
+  const team=teams.find(t=>allPlayers(t).some(x=>x.id===player.id));if(!team)return 99;const games=Math.max(...teams.filter(t=>t.league===team.league).map(t=>t.wins+t.losses+t.ties),1),batMetrics=["avg","H","HR","RBI","SB","ops"],pitchMetrics=["W","SO","HLD","SV","era","winPct"];let arr=[],val=0,asc=false,f=null;
+  if(batMetrics.includes(metric)){
+    const pool=teams.filter(t=>t.league===team.league).flatMap(t=>allPlayers(t)).filter(p=>(p.batting?.PA||0)>0),qual=regulationPAForGames(games);arr=(metric==="avg"||metric==="ops")?pool.filter(p=>p.batting.PA>=qual):pool;f={avg:p=>battingMetrics(p).avg,H:p=>p.batting.H,HR:p=>p.batting.HR,RBI:p=>p.batting.RBI,SB:p=>p.batting.SB,ops:p=>battingMetrics(p).ops}[metric];
+  }else if(player.type==="pitcher"&&pitchMetrics.includes(metric)){
+    const pool=leaguePlayerPool(team.league,"pitcher"),ipQual=Math.max(3,Math.floor(games*3)*1),winQual=Math.max(1,Math.floor(games*13/143));if(metric==="era"){arr=pool.filter(p=>p.pitching.outs>=ipQual);asc=true;}else if(metric==="winPct")arr=pool.filter(p=>p.pitching.W>=winQual&&(p.pitching.W+p.pitching.L)>0);else arr=pool;f={W:p=>p.pitching.W,SO:p=>p.pitching.SO,HLD:p=>(p.pitching.HLD||0),SV:p=>p.pitching.SV,era:p=>pitchingMetrics(p).era,winPct:p=>p.pitching.W/Math.max(1,p.pitching.W+p.pitching.L)}[metric];
+  }else return 99;
+  if(!f||!arr.includes(player))return 99;val=f(player);arr.sort((a,b)=>asc?f(a)-f(b):f(b)-f(a));const eps=1e-10,better=arr.filter(p=>{const v=f(p);return asc?v<val-eps:v>val+eps;}).length;return better+1;
 }
 function rankedStat(player,metric,text){const r=statRankInfo(player,metric),cls=r===1?"stat-first":r<=3?"stat-top3":"";return `<span class="${cls}">${text}</span>`;}
 function table(headers, rows, cls=""){
@@ -3509,7 +3563,7 @@ function render(){
       const playerCell=playerLink(p);
       const swapCell=canEdit?`<button class="mini-btn" onclick="openUsageSwapModal('lineup',${hi})">入れ替え</button>`:"";
       if(lineupViewMode==="ability"){
-        const defCell=abilityBadge(p.defense); return {className:canEdit?"draggable-row":"",attrs,cells:[orderCell,slotPos,playerCell,abilityBadge(p.contact),abilityBadge(p.power),abilityBadge(p.speed),defCell,abilityBadge(p.arm),trajectoryDisplay(p.trajectory),swapCell]};
+        const defCell=abilityBadge(effectiveDefense(p,slotPos)); return {className:canEdit?"draggable-row":"",attrs,cells:[orderCell,slotPos,playerCell,abilityBadge(p.contact),abilityBadge(p.power),abilityBadge(p.speed),defCell,abilityBadge(p.arm),trajectoryDisplay(p.trajectory),swapCell]};
       }
       const st=p.batting, m=battingMetrics(p);
       return {className:canEdit?"draggable-row":"",attrs,cells:[orderCell,slotPos,playerCell,rankedStat(p,"avg",fmt3(m.avg)),rankedStat(p,"H",st.H),rankedStat(p,"HR",st.HR),rankedStat(p,"RBI",st.RBI),rankedStat(p,"SB",st.SB),rankedStat(p,"ops",fmt3(m.ops)),swapCell]};
@@ -3539,10 +3593,10 @@ function render(){
   }else{
     document.getElementById("pinchSection").classList.add("hidden");
     document.getElementById("benchSection").classList.add("hidden");
-    const hitters=allPlayers(team).filter(p=>p.type==="hitter").sort((a,b)=>b.batting.PA-a.batting.PA || b.batting.H-a.batting.H);
+    const hitters=allPlayers(team).filter(p=>p.type==="hitter"||(p.batting?.PA||0)>0).sort((a,b)=>b.batting.PA-a.batting.PA || b.batting.H-a.batting.H);
     document.getElementById("lineup").innerHTML=table(["選手","守備","所属","PA","打率","安打","本塁打","打点","盗塁","OPS"], hitters.map(p=>{
-      const st=p.batting,m=battingMetrics(p),status=team.hitters.includes(p)?"一軍":(p.rosterType==="development"?"育成":"二軍");
-      return {cells:[playerLink(p),playerPositionsText(p),rosterStatusBadge(status),st.PA,rankedStat(p,"avg",fmt3(m.avg)),rankedStat(p,"H",st.H),rankedStat(p,"HR",st.HR),rankedStat(p,"RBI",st.RBI),rankedStat(p,"SB",st.SB),rankedStat(p,"ops",fmt3(m.ops))]};
+      const st=p.batting,m=battingMetrics(p),status=(team.hitters.includes(p)||team.pitchers.includes(p))?"一軍":(p.rosterType==="development"?"育成":"二軍");
+      return {cells:[playerLink(p),p.type==="pitcher"?`投 / ${playerPositionsText(p)}`:playerPositionsText(p),rosterStatusBadge(status),st.PA,rankedStat(p,"avg",fmt3(m.avg)),rankedStat(p,"H",st.H),rankedStat(p,"HR",st.HR),rankedStat(p,"RBI",st.RBI),rankedStat(p,"SB",st.SB),rankedStat(p,"ops",fmt3(m.ops))]};
     }));
   }
 
@@ -3561,11 +3615,11 @@ function render(){
             return {className:canEdit?"draggable-row":"",attrs:canEdit?`ondragover="allowOrderDrop(event)" ondragleave="leaveOrderDrop(event)" ondrop="dropOrder(event,'rotation',${i})"`:"",cells:[ord,name,abilityBadge(p.stuff),abilityBadge(p.control),abilityBadge(p.stamina),abilityBadge(p.breaking),`${maxVelocity(p)}km/h`,swapCell]};
           }),"ability-table")
       : pitchingViewMode==="battingAbility"
-        ? table(["順","投手","ミート","パワー","走力","弾道",canEdit?"入替":""], team.rotation.map((p,i)=>{
-            const name=playerLink(p);
+        ? table(["順","投手","野手守備","ミート","パワー","走力","守備","肩力","弾道",canEdit?"入替":""], team.rotation.map((p,i)=>{
+            ensurePitcherBatting(p);const name=playerLink(p);
             const swapCell=canEdit?`<button class="mini-btn" onclick="openUsageSwapModal('rotation',${i})">入れ替え</button>`:"";
             const ord=canEdit?`<span class="drag-handle" draggable="true" ondragstart="startOrderDrag(event,'rotation',${i})" title="ドラッグしてローテ変更">⠿</span>${i+1}`:`${i+1}`;
-            return {className:canEdit?"draggable-row":"",attrs:canEdit?`ondragover="allowOrderDrop(event)" ondragleave="leaveOrderDrop(event)" ondrop="dropOrder(event,'rotation',${i})"`:"",cells:[ord,name,abilityBadge(p.contact),abilityBadge(p.power),abilityBadge(p.speed),trajectoryDisplay(p.trajectory),swapCell]};
+            return {className:canEdit?"draggable-row":"",attrs:canEdit?`ondragover="allowOrderDrop(event)" ondragleave="leaveOrderDrop(event)" ondrop="dropOrder(event,'rotation',${i})"`:"",cells:[ord,name,playerPositionsText(p),abilityBadge(p.contact),abilityBadge(p.power),abilityBadge(p.speed),abilityBadge(p.defense),abilityBadge(p.arm),trajectoryDisplay(p.trajectory),swapCell]};
           }),"ability-table")
         : table(["順","投手","G","先発","勝敗","IP","防御率","奪三振",canEdit?"入替":""], team.rotation.map((p,i)=>{
           const st=p.pitching,m=pitchingMetrics(p); const name=playerLink(p);
@@ -3581,11 +3635,11 @@ function render(){
             return {cells:[role,playerLink(p),abilityBadge(p.stuff),abilityBadge(p.control),abilityBadge(p.stamina),abilityBadge(p.breaking),`${maxVelocity(p)}km/h`,swap]};
           }),"ability-table")
       : pitchingViewMode==="battingAbility"
-        ? table(["役割","投手","ミート","パワー","走力","弾道",canEdit?"入替":""], team.bullpen.map(p=>{
-            let role=`<span class="role-jp">${pitcherRolesLabel(p)}</span>`;
+        ? table(["役割","投手","野手守備","ミート","パワー","走力","守備","肩力","弾道",canEdit?"入替":""], team.bullpen.map(p=>{
+            ensurePitcherBatting(p);let role=`<span class="role-jp">${pitcherRolesLabel(p)}</span>`;
             if(canEdit){ role=bullpenRoleEditor(p); }
             const swap=canEdit?`<button class="mini-btn bullpen-swap-btn" onclick="openRosterSwapModal(${p.id},'active')">入れ替え</button>`:"";
-            return {cells:[role,playerLink(p),abilityBadge(p.contact),abilityBadge(p.power),abilityBadge(p.speed),trajectoryDisplay(p.trajectory),swap]};
+            return {cells:[role,playerLink(p),playerPositionsText(p),abilityBadge(p.contact),abilityBadge(p.power),abilityBadge(p.speed),abilityBadge(p.defense),abilityBadge(p.arm),trajectoryDisplay(p.trajectory),swap]};
           }),"ability-table")
         : table(["役割","投手","G","勝敗","H","S","IP","防御率","奪三振",canEdit?"入替":""], team.bullpen.map(p=>{
           const st=p.pitching,m=pitchingMetrics(p); let role=`<span class="role-jp">${pitcherRolesLabel(p)}</span>`;
@@ -3619,7 +3673,7 @@ function render(){
       } else if(p.rosterType==="development") swap=`<button class="mini-btn" onclick="promoteDevelopmentInSeason(${p.id})" ${registeredCountWithNewcomers(team)>=ORGANIZATION_LIMIT?'disabled':''}>支配下登録</button>`;
       else swap="けが中";
     }
-    const posRole=p.type==="hitter"?`<span class="farm-position">${playerPositionsText(p)}</span>`:`<span class="farm-position">${pitcherRolesLabel(p)}</span>`;
+    const posRole=p.type==="hitter"?`<span class="farm-position">${playerPositionsText(p)}</span>`:`<span class="farm-position">${pitcherRolesLabel(p)} / 野手 ${playerPositionsText(p)}</span>`;
     return {cells:[playerLink(p),p.age,posRole,type,ability,training,swap]};
   }));
   ensureTeamCoaches(team);document.getElementById("coachLabel").textContent=canEdit?`野手 ${team.developmentCoach.hitter} / 投手 ${team.developmentCoach.pitcher}`:"閲覧のみ";document.getElementById("coachSystem").innerHTML=renderCoachSystem(team,canEdit);
