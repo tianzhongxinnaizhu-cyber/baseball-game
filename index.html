@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>Baseball GM v3.32</title>
+  <title>Baseball GM v3.33</title>
   <style>
 :root {
   --bg: #f3f5f8;
@@ -353,7 +353,7 @@ table{font-size:12.2px!important}th{font-size:11.3px!important}th,td{padding:7px
 @media(max-width:760px){.year-end-screen{padding:8px}.year-end-head{align-items:flex-start;flex-direction:column}.year-end-body{padding:10px}.year-end-summary{width:100%}}
 
 
-/* -------------------- v3.32 save / load -------------------- */
+/* -------------------- v3.33 save / load -------------------- */
 .save-status{font-size:11px;color:var(--muted);padding:7px 10px;border:1px solid var(--line);border-radius:999px;background:rgba(255,255,255,.72);white-space:nowrap}
 .save-status.saved{color:#177245;border-color:rgba(23,114,69,.25);background:rgba(232,248,239,.92)}
 .save-status.error{color:#a52a2a;border-color:rgba(165,42,42,.25);background:rgba(255,239,239,.92)}
@@ -367,6 +367,15 @@ table{font-size:12.2px!important}th{font-size:11.3px!important}th,td{padding:7px
 .startup-panel .brand-mark{margin-bottom:18px}.startup-panel h2{margin:0 0 8px;font-size:28px}.startup-panel>p{color:var(--muted);line-height:1.7;margin:0 0 20px}.startup-actions{display:grid;grid-template-columns:1fr 1fr;gap:10px}.startup-actions button{min-height:48px}.startup-save-meta{margin:0 0 16px;padding:12px 14px;border-radius:14px;background:var(--soft);font-size:12px;color:var(--muted);line-height:1.6}
 @media(max-width:680px){.save-slot{grid-template-columns:1fr}.save-slot-actions{justify-content:flex-start}.startup-actions{grid-template-columns:1fr}.save-status{display:none}}
 
+
+/* -------------------- v3.33 qualification + pinch alignment -------------------- */
+.pinch-order-item{grid-template-columns:44px minmax(120px,1fr) 58px 284px!important}
+.pinch-stat{min-width:0;width:100%}
+.pinch-abilities{display:grid!important;grid-template-columns:repeat(4,64px);justify-content:end;align-items:center;gap:6px!important;width:100%;font-variant-numeric:tabular-nums}
+.pinch-abilities>span{display:grid!important;grid-template-columns:16px 44px;align-items:center;justify-content:start;column-gap:3px;white-space:nowrap;text-align:left}
+.pinch-abilities>span:last-child{grid-template-columns:16px 46px}
+.pinch-abilities .ability-badge{justify-self:start}
+@media(max-width:760px){.pinch-order-item{grid-template-columns:36px minmax(100px,1fr) 48px!important}.pinch-stat{grid-column:2/4;text-align:left}.pinch-abilities{grid-template-columns:repeat(2,68px);justify-content:start}}
 </style>
   <link rel="manifest" href="./manifest.webmanifest" />
   <meta name="theme-color" content="#111827" />
@@ -374,7 +383,7 @@ table{font-size:12.2px!important}th{font-size:11.3px!important}th,td{padding:7px
 <body>
   <header class="app-header" id="appHeader">
     <div>
-      <div class="brand-mark"><span class="brand-dot"></span><div><h1>BASEBALL GM</h1><p>FRONT OFFICE SIMULATOR <b>v3.32</b></p></div></div>
+      <div class="brand-mark"><span class="brand-dot"></span><div><h1>BASEBALL GM</h1><p>FRONT OFFICE SIMULATOR <b>v3.33</b></p></div></div>
       <p>月単位で進める編成型・野球シミュレーション</p>
     </div>
     <div class="header-actions">
@@ -712,7 +721,7 @@ table{font-size:12.2px!important}th{font-size:11.3px!important}th,td{padding:7px
 
   <div id="startupModal" class="modal-backdrop hidden">
     <div class="startup-panel">
-      <div class="brand-mark"><span class="brand-dot"></span><div><h1>BASEBALL GM</h1><p>FRONT OFFICE SIMULATOR <b>v3.32</b></p></div></div>
+      <div class="brand-mark"><span class="brand-dot"></span><div><h1>BASEBALL GM</h1><p>FRONT OFFICE SIMULATOR <b>v3.33</b></p></div></div>
       <h2>ゲームを始める</h2>
       <p>この端末に自動セーブが残っていれば、その続きから再開できます。JSONのバックアップを読み込んで別PCから続けることもできます。</p>
       <div id="startupSaveMeta" class="startup-save-meta">自動セーブを確認しています…</div>
@@ -2823,6 +2832,12 @@ function openPlayerDetail(id){
 }
 function closePlayerDetail(){document.getElementById("playerDetailModal").classList.add("hidden");}
 
+// -------------------- season qualification rules --------------------
+const REGULAR_SEASON_GAMES=143;
+const REGULATION_PA_PER_GAME=3.1;
+function regulationPAForGames(games=REGULAR_SEASON_GAMES){return Math.max(1,Math.floor(Math.max(0,games)*REGULATION_PA_PER_GAME));}
+function fullSeasonRegulationPA(){return regulationPAForGames(REGULAR_SEASON_GAMES);}
+
 // -------------------- record book --------------------
 function createRecordBook(){return {seasons:[],playerSeasons:[],awards:[],transactions:[]};}
 function recordTransaction(type,text,data={}){recordBook.transactions.unshift({year:seasonYear,type,text,...data});}
@@ -2837,7 +2852,7 @@ function snapshotPlayerSeason(team,p){
 function awardLine(label,p,extra=""){return {label,playerId:p.id,name:p.name,teamName:teams.find(t=>allPlayers(t).some(x=>x.id===p.id))?.name||"-",extra};}
 function calculateLeagueAwards(league){
   const lteams=teams.filter(t=>t.league===league),hitters=lteams.flatMap(t=>t.hitters.concat(t.minors.filter(p=>p.type==="hitter"))).filter(p=>p.batting.PA>0),pitchers=lteams.flatMap(t=>t.pitchers.concat(t.minors.filter(p=>p.type==="pitcher"))).filter(p=>p.pitching.G>0);
-  const qH=hitters.filter(p=>p.batting.PA>=443),qP=pitchers.filter(p=>p.pitching.outs>=429);
+  const paMin=fullSeasonRegulationPA(),qH=hitters.filter(p=>p.batting.PA>=paMin),qP=pitchers.filter(p=>p.pitching.outs>=429);
   const by=(arr,fn)=>arr.length?[...arr].sort((a,b)=>fn(b)-fn(a))[0]:null;
   const min=(arr,fn)=>arr.length?[...arr].sort((a,b)=>fn(a)-fn(b))[0]:null;
   const awards=[];
@@ -2954,11 +2969,12 @@ function runJapanSeriesGame(){
 }
 function currentSeasonLeaders(league){
   const lteams=teams.filter(t=>t.league===league),hitters=lteams.flatMap(t=>allPlayers(t).filter(p=>p.type==="hitter"&&p.batting.PA>0)),pitchers=lteams.flatMap(t=>allPlayers(t).filter(p=>p.type==="pitcher"&&p.pitching.G>0));
-  const qH=hitters.filter(p=>p.batting.PA>=443),qP=pitchers.filter(p=>p.pitching.outs>=429),winPctPool=pitchers.filter(p=>p.pitching.W>=13&&(p.pitching.W+p.pitching.L)>0);const by=(a,f)=>a.length?[...a].sort((x,y)=>f(y)-f(x))[0]:null,min=(a,f)=>a.length?[...a].sort((x,y)=>f(x)-f(y))[0]:null;
+  const paMin=fullSeasonRegulationPA(),qH=hitters.filter(p=>p.batting.PA>=paMin),qP=pitchers.filter(p=>p.pitching.outs>=429),winPctPool=pitchers.filter(p=>p.pitching.W>=13&&(p.pitching.W+p.pitching.L)>0);const by=(a,f)=>a.length?[...a].sort((x,y)=>f(y)-f(x))[0]:null,min=(a,f)=>a.length?[...a].sort((x,y)=>f(x)-f(y))[0]:null;
   const all=[...hitters,...pitchers].filter(p=>(p.type==="hitter"?p.batting.PA:p.pitching.G)>0),mvp=by(all,playerAwardScore);
   const data=[
     ["シーズンMVP",mvp,p=>p.type==="hitter"?`OPS ${fmt3(battingMetrics(p).ops)}`:`防御率 ${pitchingMetrics(p).era.toFixed(2)}`],
     ["首位打者",by(qH,p=>battingMetrics(p).avg),p=>fmt3(battingMetrics(p).avg)],
+    ["最高OPS",by(qH,p=>battingMetrics(p).ops),p=>fmt3(battingMetrics(p).ops)],
     ["最多安打",by(hitters,p=>p.batting.H),p=>`${p.batting.H}安打`],["本塁打王",by(hitters,p=>p.batting.HR),p=>`${p.batting.HR}本`],["打点王",by(hitters,p=>p.batting.RBI),p=>`${p.batting.RBI}打点`],["盗塁王",by(hitters,p=>p.batting.SB),p=>`${p.batting.SB}盗塁`],
     ["最多勝",by(pitchers,p=>p.pitching.W),p=>`${p.pitching.W}勝`],["最高勝率",by(winPctPool,p=>p.pitching.W/(p.pitching.W+p.pitching.L)),p=>(p.pitching.W/(p.pitching.W+p.pitching.L)).toFixed(3).replace(/^0/,"")],["最優秀防御率",min(qP,p=>pitchingMetrics(p).era),p=>pitchingMetrics(p).era.toFixed(2)],["最多奪三振",by(pitchers,p=>p.pitching.SO),p=>`${p.pitching.SO}`],["最多ホールド",by(pitchers,p=>(p.pitching.HLD||0)),p=>`${p.pitching.HLD||0}H`],["最多セーブ",by(pitchers,p=>p.pitching.SV),p=>`${p.pitching.SV}S`]
   ];
@@ -2967,7 +2983,7 @@ function currentSeasonLeaders(league){
 let liveLeaderLeague="A";
 function liveLeaguePlayers(league){return teams.filter(t=>t.league===league).flatMap(t=>allPlayers(t).map(p=>({p,team:t})));}
 function liveLeaderCards(league){
-  const lteams=teams.filter(t=>t.league===league),avgGames=lteams.reduce((s,t)=>s+t.wins+t.losses+t.ties,0)/Math.max(1,lteams.length),paMin=Math.max(1,Math.floor(avgGames*3.1)),outMin=Math.max(3,Math.floor(avgGames*3));
+  const lteams=teams.filter(t=>t.league===league),avgGames=lteams.reduce((s,t)=>s+t.wins+t.losses+t.ties,0)/Math.max(1,lteams.length),paMin=regulationPAForGames(avgGames),outMin=Math.max(3,Math.floor(avgGames*3));
   const all=liveLeaguePlayers(league),hit=all.filter(x=>x.p.type==='hitter'&&(x.p.batting?.PA||0)>0),pit=all.filter(x=>x.p.type==='pitcher'&&(x.p.pitching?.G||0)>0),qH=hit.filter(x=>(x.p.batting?.PA||0)>=paMin),qP=pit.filter(x=>(x.p.pitching?.outs||0)>=outMin);
   const top=(arr,val,n=5,asc=false)=>[...arr].sort((a,b)=>asc?val(a)-val(b):val(b)-val(a)).slice(0,n);
   const defs=[
@@ -2992,13 +3008,14 @@ function renderLeagueLeaders(){
 function showSeasonLeaders(){
   const body=["A","B"].map(l=>`<div class="season-leader-league"><h3>${l}リーグ</h3>${currentSeasonLeaders(l).map(x=>{const own=x.teamId===managedTeamId?" own-player":"",mvp=x.label==="シーズンMVP"?" mvp-row":"";return `<div class="season-leader-row${own}${mvp}"><span>${x.label}</span><strong>${x.p.name}</strong><span class="leader-team">${x.teamName}</span><b>${x.value}</b></div>`;}).join("")}</div>`).join("");
   const mt=teams[managedTeamId],entry=managedLeagueEntry();let own="";if(mt&&entry){const txt=entry.rank===1?"リーグ1位・CSファイナルステージ進出":entry.rank<=3?`リーグ${entry.rank}位・CSファーストステージ進出`:`リーグ${entry.rank}位・CS進出ならず`;own=`<div style="margin-top:10px;padding:10px 12px;border-radius:10px;background:#f7f9fc;border:1px solid #dce4ed;font-weight:900">自チーム ${mt.name}：${txt}</div>`;}
-  document.getElementById("seasonLeadersTitle").textContent=`${seasonYear}年 レギュラーシーズン主要記録`;document.getElementById("seasonLeadersBody").innerHTML=`<div class="season-leader-grid">${body}</div>${own}`;document.getElementById("seasonLeadersModal").classList.remove("hidden");
+  const paMin=fullSeasonRegulationPA();
+  document.getElementById("seasonLeadersTitle").textContent=`${seasonYear}年 レギュラーシーズン主要記録`;document.getElementById("seasonLeadersBody").innerHTML=`<div class="market-note" style="margin-bottom:10px">率系打撃記録（首位打者・最高OPS）は規定打席 ${paMin}（${REGULAR_SEASON_GAMES}試合 × ${REGULATION_PA_PER_GAME}）以上の選手のみ対象です。</div><div class="season-leader-grid">${body}</div>${own}`;document.getElementById("seasonLeadersModal").classList.remove("hidden");
 }
 function closeSeasonLeaders(){document.getElementById("seasonLeadersModal").classList.add("hidden");}
 
 // -------------------- season --------------------
 
-const APP_VERSION="3.32";
+const APP_VERSION="3.33";
 const SAVE_SCHEMA=1;
 const SAVE_KEYS={auto:"baseballGM_save_auto",slot1:"baseballGM_save_slot1",slot2:"baseballGM_save_slot2",slot3:"baseballGM_save_slot3"};
 let saveSuspend=false,autosaveTimer=null,lastSaveStamp=0;
@@ -3384,7 +3401,7 @@ function leaguePlayerPool(league,type){return teams.filter(t=>t.league===league)
 function statRankInfo(player,metric){
   const team=teams.find(t=>allPlayers(t).some(x=>x.id===player.id));if(!team)return 99;const games=Math.max(...teams.filter(t=>t.league===team.league).map(t=>t.wins+t.losses+t.ties),1),pool=leaguePlayerPool(team.league,player.type);let arr=[],val=0,asc=false;
   if(player.type==="hitter"){
-    const qual=Math.max(1,Math.floor(games*3.1));arr=(metric==="avg"||metric==="ops")?pool.filter(p=>p.batting.PA>=qual):pool;const f={avg:p=>battingMetrics(p).avg,H:p=>p.batting.H,HR:p=>p.batting.HR,RBI:p=>p.batting.RBI,SB:p=>p.batting.SB,ops:p=>battingMetrics(p).ops}[metric];if(!f||!arr.includes(player))return 99;val=f(player);arr.sort((a,b)=>f(b)-f(a));
+    const qual=regulationPAForGames(games);arr=(metric==="avg"||metric==="ops")?pool.filter(p=>p.batting.PA>=qual):pool;const f={avg:p=>battingMetrics(p).avg,H:p=>p.batting.H,HR:p=>p.batting.HR,RBI:p=>p.batting.RBI,SB:p=>p.batting.SB,ops:p=>battingMetrics(p).ops}[metric];if(!f||!arr.includes(player))return 99;val=f(player);arr.sort((a,b)=>f(b)-f(a));
   }else{
     const ipQual=Math.max(3,Math.floor(games*3)*1),winQual=Math.max(1,Math.floor(games*13/143));
     if(metric==="era"){arr=pool.filter(p=>p.pitching.outs>=ipQual);asc=true;}else if(metric==="winPct")arr=pool.filter(p=>p.pitching.W>=winQual&&(p.pitching.W+p.pitching.L)>0);else arr=pool;
