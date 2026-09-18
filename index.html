@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>Baseball GM v3.37</title>
+  <title>Baseball GM v3.38</title>
   <style>
 :root {
   --bg: #f3f5f8;
@@ -398,7 +398,7 @@ table{font-size:12.2px!important}th{font-size:11.3px!important}th,td{padding:7px
 <body>
   <header class="app-header" id="appHeader">
     <div>
-      <div class="brand-mark"><span class="brand-dot"></span><div><h1>BASEBALL GM</h1><p>FRONT OFFICE SIMULATOR <b>v3.35</b></p></div></div>
+      <div class="brand-mark"><span class="brand-dot"></span><div><h1>BASEBALL GM</h1><p>FRONT OFFICE SIMULATOR <b>v3.38</b></p></div></div>
       <p>月単位で進める編成型・野球シミュレーション</p>
     </div>
     <div class="header-actions">
@@ -736,7 +736,7 @@ table{font-size:12.2px!important}th{font-size:11.3px!important}th,td{padding:7px
 
   <div id="startupModal" class="modal-backdrop hidden">
     <div class="startup-panel">
-      <div class="brand-mark"><span class="brand-dot"></span><div><h1>BASEBALL GM</h1><p>FRONT OFFICE SIMULATOR <b>v3.35</b></p></div></div>
+      <div class="brand-mark"><span class="brand-dot"></span><div><h1>BASEBALL GM</h1><p>FRONT OFFICE SIMULATOR <b>v3.38</b></p></div></div>
       <h2>ゲームを始める</h2>
       <p>この端末に自動セーブが残っていれば、その続きから再開できます。JSONのバックアップを読み込んで別PCから続けることもできます。</p>
       <div id="startupSaveMeta" class="startup-save-meta">自動セーブを確認しています…</div>
@@ -2898,6 +2898,32 @@ function currentCareerSummary(p){
   }
   return p.type==="hitter"?`${h}安打 / ${hr}本塁打 / ${rbi}打点 / ${sb}盗塁`:`${w}勝${l}敗 / ${so}奪三振 / ${hld}H / ${sv}S`;
 }
+function addCareerStats(target,source){if(!source)return target;for(const k of Object.keys(target))target[k]+=(Number(source[k])||0);return target;}
+function careerBattingAggregate(p){
+  const total=blankBatting(),years=new Set(),rows=playerSeasonRows(p.id),hasSavedCurrent=rows.some(r=>r.year===seasonYear);
+  for(const r of rows){const st=r.type==="hitter"?r.stats:r.battingStats;if(!st)continue;addCareerStats(total,st);if((st.PA||0)>0)years.add(r.year);}
+  if(!hasSavedCurrent&&(p.batting?.PA||0)>0){addCareerStats(total,p.batting);years.add(seasonYear);}
+  const m=battingMetrics({batting:total});return {stats:total,metrics:m,seasons:years.size};
+}
+function careerPitchingAggregate(p){
+  const total=blankPitching(),years=new Set(),rows=playerSeasonRows(p.id),hasSavedCurrent=rows.some(r=>r.year===seasonYear);
+  for(const r of rows){if(r.type!=="pitcher"||!r.stats)continue;addCareerStats(total,r.stats);if((r.stats.G||0)>0)years.add(r.year);}
+  if(!hasSavedCurrent&&p.type==="pitcher"&&(p.pitching?.G||0)>0){addCareerStats(total,p.pitching);years.add(seasonYear);}
+  const outs=total.outs||0,ip=outs/3,era=outs?total.ER*27/outs:null,whip=outs?(total.H+total.BB)/ip:null;
+  return {stats:total,seasons:years.size,era,whip};
+}
+function renderPlayerCareerStats(p){
+  const blocks=[];
+  if(p.type==="pitcher"){
+    const q=careerPitchingAggregate(p),s=q.stats,ip=`${Math.floor((s.outs||0)/3)}.${(s.outs||0)%3}`;
+    blocks.push(`<div class="pitcher-ability-heading">通算投手成績${q.seasons?`（実働 ${q.seasons}年）`:""}</div>${table(["G","先発","勝","敗","HLD","SV","IP","防御率","WHIP","被安打","被本塁打","四球","死球","奪三振"],[{cells:[s.G,s.GS,s.W,s.L,s.HLD||0,s.SV,ip,q.era==null?"-":q.era.toFixed(2),q.whip==null?"-":q.whip.toFixed(2),s.H,s.HR,s.BB,s.HBP,s.SO]}])}`);
+  }
+  const b=careerBattingAggregate(p),s=b.stats,m=b.metrics;
+  if(p.type==="hitter"||(s.PA||0)>0){
+    blocks.push(`<div class="pitcher-ability-heading" style="margin-top:${blocks.length?10:0}px">通算打撃成績${b.seasons?`（実働 ${b.seasons}年）`:""}</div>${table(["PA","AB","打率","出塁率","長打率","OPS","安打","二塁打","三塁打","本塁打","得点","打点","四球","死球","三振","盗塁","盗塁死","犠飛","併殺"],[{cells:[s.PA,s.AB,fmt3(m.avg),fmt3(m.obp),fmt3(m.slg),fmt3(m.ops),s.H,s.D2,s.D3,s.HR,s.R,s.RBI,s.BB,s.HBP,s.SO,s.SB,s.CS,s.SF,s.GDP]}])}`);
+  }
+  return blocks.join("")||'<div class="summary-empty">通算成績はまだありません。</div>';
+}
 function renderPlayerSeasonTable(p){
   let rows=playerSeasonRows(p.id).slice();const found=rows.some(r=>r.year===seasonYear);
   const cur=findPlayerAnywhere(p.id);if(cur&&!found&&((p.type==="hitter"&&(p.batting?.PA||0)>0)||(p.type==="pitcher"&&(p.pitching?.G||0)>0))){rows.push(snapshotPlayerSeason(cur.team||{id:-1,name:"-",league:"-"},p));}
@@ -2917,7 +2943,7 @@ function openPlayerDetail(id){
   const injuryHtml=inj.length?[...inj].reverse().map(x=>`<div class="detail-list-row"><span class="label">${x.year}</span><span class="value">${x.label||"負傷"} / 約${x.games}試合離脱</span></div>`).join(""):'<div class="summary-empty">けが履歴なし</div>';
   const draftTx=(recordBook.transactions||[]).filter(x=>x.playerId===p.id&&(x.type==="ドラフト"||x.type==="育成ドラフト"))[0];
   const entry=draftTx?draftTx.text:(p.draftedYear?`${p.draftedYear}年ドラフト入団`:p.isForeign?"外国人選手":"初期所属選手");
-  document.getElementById("playerDetailBody").innerHTML=`<div class="player-detail-grid"><div><div class="player-detail-card"><h3>現在能力</h3><div class="inner">${detailAbilityHtml(p)}<div class="career-chip-row"><span class="career-chip">${entry}</span><span class="career-chip">通算 ${currentCareerSummary(p)}</span></div></div></div><div class="player-detail-card" style="margin-top:10px"><h3>年度別成績</h3><div class="inner">${renderPlayerSeasonTable(p)}</div></div></div><div><div class="player-detail-card"><h3>能力推移</h3><div class="inner">${renderAbilityHistory(p)}</div></div><div class="player-detail-card" style="margin-top:10px"><h3>受賞歴</h3><div class="inner detail-list">${awardHtml}</div></div><div class="player-detail-card" style="margin-top:10px"><h3>所属・移籍履歴</h3><div class="inner detail-list">${moveHtml}</div></div><div class="player-detail-card" style="margin-top:10px"><h3>けが履歴</h3><div class="inner detail-list">${injuryHtml}</div></div></div></div>`;
+  document.getElementById("playerDetailBody").innerHTML=`<div class="player-detail-grid"><div><div class="player-detail-card"><h3>現在能力</h3><div class="inner">${detailAbilityHtml(p)}<div class="career-chip-row"><span class="career-chip">${entry}</span><span class="career-chip">通算 ${currentCareerSummary(p)}</span></div></div></div><div class="player-detail-card" style="margin-top:10px"><h3>通算成績</h3><div class="inner">${renderPlayerCareerStats(p)}</div></div><div class="player-detail-card" style="margin-top:10px"><h3>年度別成績</h3><div class="inner">${renderPlayerSeasonTable(p)}</div></div></div><div><div class="player-detail-card"><h3>能力推移</h3><div class="inner">${renderAbilityHistory(p)}</div></div><div class="player-detail-card" style="margin-top:10px"><h3>受賞歴</h3><div class="inner detail-list">${awardHtml}</div></div><div class="player-detail-card" style="margin-top:10px"><h3>所属・移籍履歴</h3><div class="inner detail-list">${moveHtml}</div></div><div class="player-detail-card" style="margin-top:10px"><h3>けが履歴</h3><div class="inner detail-list">${injuryHtml}</div></div></div></div>`;
   document.getElementById("playerDetailModal").classList.remove("hidden");
 }
 function closePlayerDetail(){document.getElementById("playerDetailModal").classList.add("hidden");}
@@ -3105,7 +3131,7 @@ function closeSeasonLeaders(){document.getElementById("seasonLeadersModal").clas
 
 // -------------------- season --------------------
 
-const APP_VERSION="3.37";
+const APP_VERSION="3.38";
 const SAVE_SCHEMA=1;
 const SAVE_KEYS={auto:"baseballGM_save_auto",slot1:"baseballGM_save_slot1",slot2:"baseballGM_save_slot2",slot3:"baseballGM_save_slot3"};
 let saveSuspend=false,autosaveTimer=null,lastSaveStamp=0;
